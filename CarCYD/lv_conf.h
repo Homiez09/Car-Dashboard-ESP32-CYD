@@ -2368,6 +2368,18 @@
 /** LV_ASSERT_MALLOC */
 #define LV_USE_ASSERT_MALLOC 1
 
+/* CarCYD: a failed assertion (typically out of memory) must not freeze the device with
+ * LVGL's default `while(1);` - carcyd_lv_assert_failed() logs it, falls back to the demo
+ * source if a radio was in use, and restarts (app.cpp; the simulator aborts). */
+#ifdef __cplusplus
+extern "C" {
+#endif
+void carcyd_lv_assert_failed(void);
+#ifdef __cplusplus
+}
+#endif
+#define LV_ASSERT_HANDLER carcyd_lv_assert_failed();
+
 /** LV_ASSERT_NULL */
 #define LV_USE_ASSERT_NULL 1
 

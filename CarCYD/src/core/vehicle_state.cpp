@@ -20,7 +20,7 @@ void VehicleState::invalidate_all() {
 
 bool VehicleState::fresh(SignalId id, uint32_t now_ms) const {
   const SignalValue& s = get(id);
-  return s.valid && elapsed(now_ms, s.updated_ms) <= kSignalStaleMs;
+  return s.valid && elapsed(now_ms, s.updated_ms) <= stale_after_ms;
 }
 
 float VehicleState::value_or(SignalId id, uint32_t now_ms, float fallback) const {

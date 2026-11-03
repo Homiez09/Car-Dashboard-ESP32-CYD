@@ -22,6 +22,7 @@ namespace core {
 
 constexpr uint8_t kCornerSlots = 4;
 constexpr uint8_t kGaugeSlots = 6;
+constexpr uint8_t kAdapterNameLen = 33;  ///< Bluetooth name / Wi-Fi SSID incl. terminator
 
 /**
  * Persisted settings. Trivially copyable; NEVER reorder or remove fields -
@@ -55,14 +56,20 @@ struct Settings {
   uint8_t volume;  ///< %
   bool status_led;
   // Data source
-  bool demo_mode;
+  bool demo_mode;  ///< simulated car: PC simulator only, the firmware always uses the OBD adapter
   // Dashboard layout
   uint8_t dash_view;
   SignalId corner_slots[kCornerSlots];
   SignalId gauge_slots[kGaugeSlots];
+  // ---- v2: ELM327 adapter (used when demo_mode is false) ----
+  AdapterTransport adapter;
+  bool bt_addr_valid;
+  uint8_t bt_addr[6];
+  char bt_name[kAdapterNameLen];
+  char wifi_ssid[kAdapterNameLen];
 };
 
-constexpr uint16_t kSettingsVersion = 1;
+constexpr uint16_t kSettingsVersion = 2;
 
 namespace settings {
 
@@ -79,6 +86,7 @@ enum Change : uint32_t {
   kChangeLed = 1u << 8,
   kChangeDataSource = 1u << 9,
   kChangeLayout = 1u << 10,  ///< dashboard view / slots
+  kChangeAdapter = 1u << 11,  ///< adapter found by the automatic search (no reconnect)
   kChangeAll = 0xFFFFFFFFu,
 };
 

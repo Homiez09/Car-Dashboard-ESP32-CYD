@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include "touch_calibration.h"
+#include "types.h"
 
 namespace platform {
 
@@ -30,6 +31,8 @@ struct SystemInfo {
   const char* sdk_version;
   const char* board_name;
   const char* panel_name;
+  const char* reset_reason;  ///< why the device last restarted (power on, brownout, crash, ...)
+  const char* radio_report;  ///< radio step + free heap if Bluetooth / Wi-Fi caused that restart, else ""
 };
 
 void system_info(SystemInfo& out);
@@ -75,5 +78,24 @@ void touch_apply_calibration(const core::TouchCalibration& cal);
 
 /** Enables/disables normal pointer input (disabled while calibrating). */
 void touch_input_enable(bool enable);
+
+// ---- OBD adapter discovery ------------------------------------------------------------
+
+struct AdapterInfo {
+  char name[33];       ///< Bluetooth device name or Wi-Fi SSID
+  uint8_t address[6];  ///< Bluetooth device address (unused for Wi-Fi)
+  int8_t rssi;         ///< dBm
+  bool secured;        ///< Wi-Fi network needs a password (not supported)
+  bool likely_obd;     ///< name looks like an OBD adapter (OBD, ELM, V-LINK, ...)
+};
+
+/** Starts a background scan for Bluetooth devices or Wi-Fi networks. */
+bool adapter_scan_start(core::AdapterTransport transport);
+
+/** True while the scan started by adapter_scan_start() is running. */
+bool adapter_scan_running();
+
+/** Results found so far, likely OBD adapters first, then by signal strength. */
+uint8_t adapter_scan_results(AdapterInfo* out, uint8_t max);
 
 }  // namespace platform

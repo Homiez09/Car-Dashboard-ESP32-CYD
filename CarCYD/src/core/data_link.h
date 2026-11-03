@@ -7,9 +7,9 @@
  * directly; it only reads VehicleState and calls core::link::request_*().
  *
  * Implementations:
- *   - SimLink  : demo mode, simulates a driving car (sim_link.h)
- *   - NullLink : no interface connected (below)
- *   - the vehicle interface ESP32 link will be added here (UART / ESP-NOW)
+ *   - SimLink    : demo mode, simulates a driving car (sim_link.h)
+ *   - Elm327Link : ELM327 OBD-II adapter over Bluetooth or Wi-Fi (elm327_link.h)
+ *   - NullLink   : no interface connected (below)
  */
 #pragma once
 

@@ -31,7 +31,7 @@ void* alloc_dma(size_t bytes) { return heap_caps_malloc(bytes, MALLOC_CAP_DMA | 
 
 }  // namespace
 
-lv_display_t* init(bool flipped) {
+lv_display_t* init(bool flipped, uint16_t lines) {
   lgfx::LGFX_Device& dev = lcd();
   if (!dev.init()) {
     LOG_E("DISP", "panel init failed");
@@ -45,11 +45,24 @@ lv_display_t* init(bool flipped) {
 
   const int32_t w = dev.width();
   const int32_t h = dev.height();
-  const size_t buffer_bytes = static_cast<size_t>(w) * APP_DRAW_BUFFER_LINES * sizeof(uint16_t);
-  void* buf1 = alloc_dma(buffer_bytes);
-  void* buf2 = alloc_dma(buffer_bytes);
-  if (buf1 == nullptr || buf2 == nullptr) {
-    LOG_E("DISP", "cannot allocate %u B draw buffers", static_cast<unsigned>(2 * buffer_bytes));
+  // Two buffers of `lines` rows; with little memory halve the size, finally one buffer.
+  size_t buffer_bytes = 0;
+  void* buf1 = nullptr;
+  void* buf2 = nullptr;
+  for (; lines >= 8; lines /= 2) {
+    buffer_bytes = static_cast<size_t>(w) * lines * sizeof(uint16_t);
+    buf1 = alloc_dma(buffer_bytes);
+    buf2 = alloc_dma(buffer_bytes);
+    if (buf1 != nullptr && buf2 != nullptr) break;
+    heap_caps_free(buf2);
+    buf2 = nullptr;
+    if (buf1 != nullptr && lines / 2 < 8) break;  // smallest size: render with one buffer
+    heap_caps_free(buf1);
+    buf1 = nullptr;
+  }
+  if (buf1 == nullptr) {
+    LOG_E("DISP", "cannot allocate draw buffers (largest DMA block %u B)",
+          static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL)));
     return nullptr;
   }
 
@@ -57,8 +70,8 @@ lv_display_t* init(bool flipped) {
   lv_display_set_color_format(g_display, LV_COLOR_FORMAT_RGB565_SWAPPED);
   lv_display_set_buffers(g_display, buf1, buf2, buffer_bytes, LV_DISPLAY_RENDER_MODE_PARTIAL);
   lv_display_set_flush_cb(g_display, flush_cb);
-  LOG_I("DISP", "%s %ldx%ld, 2 x %u B DMA buffers", lcd_panel_name(), static_cast<long>(w), static_cast<long>(h),
-        static_cast<unsigned>(buffer_bytes));
+  LOG_I("DISP", "%s %ldx%ld, %u x %u B DMA buffers", lcd_panel_name(), static_cast<long>(w), static_cast<long>(h),
+        buf2 != nullptr ? 2u : 1u, static_cast<unsigned>(buffer_bytes));
   return g_display;
 }
 

@@ -27,3 +27,4 @@
 
 // ---- Display ---------------------------------------------------------------------------------
 #define APP_DRAW_BUFFER_LINES 40     // 2 x (320 x 40 x 2 B) = 50 KB DMA buffers
+#define APP_DRAW_BUFFER_LINES_BT 16  // 2 x 10 KB with Bluetooth: its stack needs the memory

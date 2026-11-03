@@ -17,7 +17,7 @@ and code are all welcome.
 2. Open `CarCYD/CarCYD.ino` and select your board variant in `CarCYD/src/config/board_config.h`.
 3. Build with all warnings enabled — the project compiles without warnings and should stay that way:
    ```bash
-   arduino-cli compile --fqbn esp32:esp32:esp32 --warnings all CarCYD
+   arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=huge_app --warnings all CarCYD
    ```
 4. For UI work, use the desktop simulator (no board needed):
    ```bash

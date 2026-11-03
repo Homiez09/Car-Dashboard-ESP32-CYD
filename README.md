@@ -39,8 +39,8 @@ the board into a digital **gauge cluster** with a tachometer and speedometer, **
 settings. It was designed and engineered like a commercial automotive HMI: clean layered architecture,
 DMA display driver, persistent settings, touch calibration, auto-brightness, localization and a PC simulator.
 
-> **No car? No problem.** A built-in demo mode simulates a car being driven — cold start, gear shifts,
-> warnings and stored fault codes — so everything works the minute you flash it.
+> **No car at hand?** The PC simulator renders every screen with a simulated car (cold start, gear shifts,
+> warnings, stored fault codes) — see [Develop the UI on your PC](#%EF%B8%8F-develop-the-ui-on-your-pc). The firmware itself always reads the car through an ELM327 adapter.
 
 ## 🎬 Demo
 
@@ -56,6 +56,7 @@ DMA display driver, persistent settings, touch calibration, auto-brightness, loc
 | 🏎️ **Gauge cluster** | 270° tachometer ring with red zone, digital speed, gear indicator, flashing **shift light**, start-up needle sweep |
 | 📊 **Two dashboard views** | Cluster with four corner values, or six mini gauges — swipe to switch, **long-press to customize** any value |
 | 📈 **Live data** | 18 engine signals with severity colors; tap for a real-time **chart with min / avg / max** |
+| 🔌 **ELM327 OBD-II adapter** | Real car data over **Bluetooth** or **Wi-Fi**: scan and pick the adapter in the settings, automatic protocol detection, live PIDs, battery voltage; status bar icons for the adapter and vehicle link |
 | 🔧 **OBD-II diagnostics** | Check-engine (MIL) status, **read & clear DTCs**, stored / pending / permanent codes, descriptions for 92 common codes, severity and advice |
 | 🚨 **Driver alerts** | Coolant, oil, battery low/high, fuel, speed limit, check engine, link lost — debounced, with hysteresis, on-screen banner, sound and LED |
 | 🧭 **Trip computer** | Distance, drive time, average / max speed, fuel used, average consumption and a **0-100 km/h (0-60 mph) timer** |
@@ -114,7 +115,7 @@ DMA display driver, persistent settings, touch calibration, auto-brightness, loc
 | USB cable | Micro-USB or USB-C depending on the board |
 | Small 8 Ω speaker *(optional)* | JST 1.25 mm "SPEAK" connector for alert sounds |
 | 12 V → 5 V automotive converter *(in the car)* | Load-dump protected; see [hardware notes](docs/hardware.md#in-car-installation) |
-| Vehicle interface *(coming)* | A second ESP32 with a CAN / OBD-II front end — see the [roadmap](#-roadmap) |
+| ELM327 OBD-II adapter *(for real car data)* | Bluetooth Classic ("OBDII", "V-LINK", ...; PIN 1234 / 0000 / 6789 / 1111 tried automatically) or Wi-Fi ("WiFi_OBDII", open network) — BLE-only adapters are not supported |
 
 ## 🚀 Quick start
 
@@ -152,7 +153,8 @@ The image contains bootloader, partition table and application, so flashing it a
    | micro-USB **and** USB-C | `CYD_PANEL_ILI9341_2` and `CYD_PANEL_INVERT 1` *(repository default)* |
    | 2-USB board with ST7789 | `CYD_PANEL_ST7789` and `CYD_PANEL_INVERT 0` |
 
-5. **Tools menu:** Board *ESP32 Dev Module*, Partition Scheme *Default 4MB with spiffs*, PSRAM *Disabled*.
+5. **Tools menu:** Board *ESP32 Dev Module*, Partition Scheme **Huge APP (3MB No OTA/1MB SPIFFS)**, PSRAM *Disabled*.
+   The Bluetooth and Wi-Fi stacks do not fit the default 1.25 MB app partition ("Sketch too big").
 6. **Upload.** On the first start a short touch calibration runs (tap four targets). Done.
 
 ### arduino-cli
@@ -160,11 +162,11 @@ The image contains bootloader, partition table and application, so flashing it a
 ```bash
 arduino-cli core install esp32:esp32 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
 arduino-cli lib install "lvgl@9.6.0" "LovyanGFX"
-arduino-cli compile --fqbn esp32:esp32:esp32 CarCYD
-arduino-cli upload  --fqbn esp32:esp32:esp32 -p COM5 CarCYD   # your serial port
+arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=huge_app CarCYD
+arduino-cli upload  --fqbn esp32:esp32:esp32:PartitionScheme=huge_app -p COM5 CarCYD   # your serial port
 ```
 
-The firmware uses about **770 KB flash** and **26 KB static RAM** and builds with zero warnings.
+The firmware uses about **2.1 MB flash** (Bluetooth + Wi-Fi stacks) and **69 KB static RAM** and builds with zero warnings.
 
 ## 🕹️ Using it
 
@@ -173,15 +175,19 @@ The firmware uses about **770 KB flash** and **26 KB static RAM** and builds wit
 - **Alerts:** tap the banner to acknowledge. Critical alerts repeat their sound until acknowledged.
 - **BOOT button:** short press = acknowledge alert / next page · long press = back to the dashboard ·
   hold during power-up = touch calibration.
-- **Data source:** *Settings → Connection* switches between **Demo** and the **ESP32 link**.
+- **Real car:** plug the ELM327 adapter in, switch the ignition on, then *Settings → Connection* → choose
+  **Bluetooth** or **Wi-Fi**. The adapter is found automatically (any vendor whose name looks like an OBD
+  adapter) and remembered; if yours has an unusual name, tap *OBD adapter* and pick it from the scan list.
+  Status bar: the Bluetooth / Wi-Fi icon is the adapter link, the car icon the link to the engine ECU —
+  blinking = connecting, green = connected, red = error.
 
 ## 🏗️ Architecture
 
 ```mermaid
 flowchart LR
     subgraph Vehicle data
-        SIM[Demo simulator] --> LINK{{DataLink}}
-        ESP[ESP32 vehicle link<br/><i>coming soon</i>] -.-> LINK
+        SIM[Simulated car<br/><i>PC simulator</i>] -.-> LINK{{DataLink}}
+        ELM[ELM327 link<br/>Bluetooth · Wi-Fi] --> LINK
     end
     LINK --> STATE[(Vehicle state)]
     STATE --> ALERTS[Alert manager]
@@ -200,8 +206,8 @@ flowchart LR
 - **`ui/`** — LVGL pages and reusable components built on a small design system (`theme.h`).
 - **`app/`** — composition root and the cooperative main loop.
 
-Adding the real vehicle connection means implementing **one class** (`core::DataLink`); the UI, alerts and trip
-computer need no changes. Read more in [docs/architecture.md](docs/architecture.md) and the
+Data sources implement **one class** (`core::DataLink`): the ELM327 link and, in the PC simulator, a simulated car (protocol in
+`core/`, Bluetooth / Wi-Fi transports in `hal/`); the UI, alerts and trip computer need no changes. Read more in [docs/architecture.md](docs/architecture.md) and the
 [UI guidelines](docs/ui-guidelines.md).
 
 <details>
@@ -240,11 +246,11 @@ See [tools/simulator](tools/simulator/README.md). Fonts and icons are regenerate
 ## 🗺️ Roadmap
 
 - [x] Gauge cluster, live data, diagnostics, trip computer, alerts, settings
-- [x] Demo mode, touch calibration, auto brightness, localization, PC simulator
-- [ ] **Vehicle link:** second ESP32 with CAN / OBD-II over UART (CN1) or ESP-NOW
+- [x] Touch calibration, auto brightness, localization, PC simulator with a simulated car
+- [x] **Vehicle link:** ELM327 OBD-II adapter over Bluetooth Classic or Wi-Fi
 - [ ] Freeze-frame data and readiness monitors
 - [ ] Data logging to the micro SD card (CSV)
-- [ ] OTA updates (the default partition scheme is already OTA ready)
+- [ ] OTA updates (needs a single-radio build: Bluetooth + Wi-Fi do not fit two OTA slots in 4 MB)
 - [ ] PlatformIO project file
 - [ ] More languages — contributions welcome!
 
@@ -253,9 +259,10 @@ See [tools/simulator](tools/simulator/README.md). Fonts and icons are regenerate
 <details>
 <summary><b>Can the CYD read my car's OBD-II port directly?</b></summary>
 
-No. The board has no CAN transceiver or K-Line interface. CarCYD is designed to receive vehicle data from a
-separate interface (for example a second ESP32 with a CAN transceiver) through the `DataLink` abstraction.
-Until that link exists, the demo mode shows exactly how everything behaves.
+Not by wire — the board has no CAN transceiver or K-Line interface. Plug a cheap **ELM327** adapter into the
+car's OBD-II port and CarCYD reads it wirelessly over **Bluetooth Classic** or **Wi-Fi** (*Settings →
+Connection*). All OBD-II protocols the adapter supports (CAN, KWP2000, ISO 9141, J1850) work; the protocol is
+detected automatically.
 </details>
 
 <details>

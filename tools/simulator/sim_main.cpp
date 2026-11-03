@@ -9,6 +9,7 @@
  * Usage: carcyd_sim <output dir> [tr|en]
  */
 #include <lvgl.h>
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -18,14 +19,18 @@
 
 #include "../../CarCYD/src/core/alerts.h"
 #include "../../CarCYD/src/core/data_link.h"
+#include "../../CarCYD/src/core/elm327_link.h"
 #include "../../CarCYD/src/core/i18n.h"
 #include "../../CarCYD/src/core/log.h"
 #include "../../CarCYD/src/core/settings.h"
 #include "../../CarCYD/src/core/sim_link.h"
 #include "../../CarCYD/src/core/trip.h"
 #include "../../CarCYD/src/core/vehicle_state.h"
+#include "../../CarCYD/src/ui/components/adapter_picker.h"
+#include "../../CarCYD/src/ui/components/dialog.h"
 #include "../../CarCYD/src/ui/ui.h"
 #include "sim.h"
+#include "sim_elm.h"
 
 namespace sim {
 namespace {
@@ -42,6 +47,9 @@ int32_t g_y = 0;
 uint16_t g_fb[kW * kH];
 std::string g_out_dir = "screenshots";
 core::SimLink g_link;
+core::Elm327Link g_elm;
+FakeElm327 g_fake_bt(core::AdapterTransport::Bluetooth);
+FakeElm327 g_fake_wifi(core::AdapterTransport::Wifi);
 int g_shots = 0;
 
 // Animation recording (demo GIF): one frame every kFrameMs while recording.
@@ -133,6 +141,20 @@ void loop_once() {
 }
 
 }  // namespace
+
+/** Same data source selection as app.cpp, with emulated ELM327 adapters. */
+void on_settings_changed(uint32_t changes, void*) {
+  if ((changes & core::settings::kChangeDataSource) == 0) return;
+  const core::Settings& s = core::settings::get();
+  core::DataLink* link = &g_link;
+  if (!s.demo_mode) {
+    g_elm.set_transport(s.adapter == core::AdapterTransport::Bluetooth ? &g_fake_bt : &g_fake_wifi);
+    link = &g_elm;
+  }
+  ui::set_keep_pages(s.demo_mode);  // same low-memory mode as the device
+  if (core::link::active() == link) core::link::set_active(nullptr, g_now);
+  core::link::set_active(link, g_now);
+}
 
 uint32_t now() { return g_now; }
 bool touch_pressed() { return g_pressed; }
@@ -367,6 +389,197 @@ void scenario() {
   run(500);
 }
 
+// OBD-II adapter (emulated ELM327) ------------------------------------------------------------
+
+int g_failures = 0;
+
+void check(bool ok, const char* what) {
+  printf("[sim] %s  %s\n", ok ? "PASS" : "FAIL", what);
+  if (!ok) ++g_failures;
+}
+
+bool near(SignalId id, float tolerance) {
+  const core::VehicleState& model = sim::g_fake_bt.model();
+  const float expected = model.value_or(id, sim::now(), NAN);
+  const float actual = core::vehicle().value_or(id, sim::now(), NAN);
+  const bool ok = !isnan(expected) && !isnan(actual) && fabsf(expected - actual) <= tolerance;
+  if (!ok) printf("[sim] model %.2f, parsed %.2f\n", static_cast<double>(expected), static_cast<double>(actual));
+  return ok;
+}
+
+bool has_code(uint16_t code, core::DtcStatus status) {
+  const core::DtcState& dtc = core::vehicle().dtc;
+  for (uint8_t i = 0; i < dtc.count; ++i) {
+    if (dtc.codes[i].code == code && dtc.codes[i].status == status) return true;
+  }
+  return false;
+}
+
+void select_adapter(core::AdapterTransport transport) {
+  core::Settings& s = core::settings::edit();
+  s.demo_mode = false;
+  s.adapter = transport;
+  if (transport == core::AdapterTransport::Bluetooth) {
+    const uint8_t address[6] = {0x00, 0x1D, 0xA5, 0x68, 0x98, 0x02};
+    memcpy(s.bt_addr, address, sizeof(address));
+    s.bt_addr_valid = true;
+    snprintf(s.bt_name, sizeof(s.bt_name), "OBDII");
+  } else {
+    snprintf(s.wifi_ssid, sizeof(s.wifi_ssid), "WiFi_OBDII");
+  }
+  core::settings::commit(core::settings::kChangeDataSource);
+}
+
+bool dialog_open() { return ui::dialog::is_open(); }
+
+bool connected() {
+  const core::VehicleState& v = core::vehicle();
+  return v.adapter_state == core::LinkState::Connected && v.link_state == core::LinkState::Connected;
+}
+
+/** ELM327 response parsing against recorded adapter output. */
+void parser_checks() {
+  namespace elm = core::elm327;
+  uint8_t d[8];
+  uint8_t len = 0;
+  SignalId id;
+  float value = 0;
+
+  check(elm::parse_pid("41 0C 1A F8\r", 0x0C, d, sizeof(d), len) && len == 2 &&
+            elm::decode_pid(0x0C, d, len, id, value) && id == SignalId::Rpm && value == 1726.0f,
+        "parse 41 0C 1A F8 -> 1726 rpm");
+  check(elm::parse_pid("010D\r410D3C\r", 0x0D, d, sizeof(d), len) && elm::decode_pid(0x0D, d, len, id, value) &&
+            value == 60.0f,
+        "parse with echo, no spaces -> 60 km/h");
+  check(elm::parse_pid("SEARCHING...\r7E8 06 41 00 BE 3F A8 13\r", 0x00, d, sizeof(d), len) == false,
+        "headers on (ATH1) are not mistaken for data");
+  check(elm::parse_pid("SEARCHING...\r41 00 BE 3F A8 13\r41 00 98 18 80 11\r", 0x00, d, sizeof(d), len) &&
+            d[0] == 0xBE,
+        "two ECUs answering 0100: first reply used");
+  const uint8_t coolant[] = {0x7B};
+  check(elm::decode_pid(0x05, coolant, 1, id, value) && value == 83.0f, "decode coolant 7B -> 83 C");
+  check(elm::classify("NO DATA\r") == elm::Reply::NoData, "classify NO DATA");
+  check(elm::classify("SEARCHING...\rUNABLE TO CONNECT\r") == elm::Reply::BusError, "classify UNABLE TO CONNECT");
+  check(elm::classify("BUS INIT: ...ERROR\r") == elm::Reply::BusError, "classify BUS INIT ERROR");
+  check(elm::classify("?\r") == elm::Reply::Unknown, "classify ?");
+
+  uint16_t codes[8];
+  check(elm::parse_dtcs("43 01 33 00 00 00 00\r", 0x43, false, codes, 8) == 1 && codes[0] == 0x0133,
+        "mode 03 K-line: P0133, padding skipped");
+  check(elm::parse_dtcs("43 02 01 43 C1 23\r", 0x43, true, codes, 8) == 2 && codes[0] == 0x0143 && codes[1] == 0xC123,
+        "mode 03 CAN single frame: P0143 U0123");
+  check(elm::parse_dtcs("43 00\r", 0x43, true, codes, 8) == 0, "mode 03 CAN: no codes");
+  check(elm::parse_dtcs("00A\r0:43 04 01 01 02 02\r1:03 03 04 04 00 00 00\r", 0x43, true, codes, 8) == 4 &&
+            codes[3] == 0x0404,
+        "mode 03 CAN multi-frame: 4 codes");
+}
+
+void obd_scenario() {
+  using namespace sim;
+  const core::VehicleState& v = core::vehicle();
+  parser_checks();
+  g_auto_ack = true;  // the emulated car reports its check engine light: keep the status bar visible
+
+  // Fresh device: Bluetooth chosen, no adapter selected yet -> tap "Tap to select".
+  core::settings::edit().demo_mode = false;
+  core::settings::edit().adapter = core::AdapterTransport::Bluetooth;
+  core::settings::edit().bt_addr_valid = false;
+  core::settings::commit(core::settings::kChangeDataSource);
+  tap(kRailX, rail_y(4));
+  run(400);
+  swipe(200, 200, 200, 40, 300);
+  run(800);
+  settings_row(102);
+  run(500);
+  tap(200, 142);  // "OBD adapter" row
+  run(2000);
+  check(dialog_open(), "tapping the adapter row opens the scan sheet");
+  snap("37_obd_scan_from_tap");
+  tap(180, 4);
+  run(300);
+  back();
+  ui::navigate(ui::PageId::Dashboard);
+  core::settings::edit().demo_mode = true;
+  core::settings::commit(core::settings::kChangeDataSource);
+  run(1000);
+
+  // Bluetooth adapter: both status icons blink while connecting.
+  select_adapter(core::AdapterTransport::Bluetooth);
+  ui::navigate(ui::PageId::Dashboard);
+  run(500);
+  snap("30_obd_connecting");
+  check(v.adapter_used && v.adapter == core::AdapterTransport::Bluetooth, "Bluetooth adapter in use");
+
+  check(run_until(connected, 20000), "adapter and vehicle connected");
+  check(v.obd_protocol == 6, "protocol ISO 15765-4 CAN 11/500 (ATDPN A6)");
+  run_until([] { return value(SignalId::Speed) > 30; }, 120000);
+  run(1500);
+  snap("31_obd_dashboard_bluetooth");
+
+  check(near(SignalId::Speed, 4.0f), "speed parsed (PID 0D)");
+  check(near(SignalId::Rpm, 400.0f), "rpm parsed (PID 0C)");
+  check(near(SignalId::CoolantTemp, 4.0f), "coolant parsed (PID 05, polled every 3 s while warming up)");
+  check(near(SignalId::FuelLevel, 1.0f), "fuel level parsed (PID 2F)");
+  check(near(SignalId::OilTemp, 1.5f), "oil temperature parsed (PID 5C)");
+  check(near(SignalId::BatteryVoltage, 0.3f), "battery voltage parsed (ATRV)");
+  check(v.fresh(SignalId::FuelRate, now()), "fuel rate estimated from MAF (no PID 5E)");
+  check(v.dtc.mil_known && v.dtc.mil_on, "MIL status read (PID 01)");
+
+  // Connection settings with live adapter / vehicle / protocol rows.
+  tap(kRailX, rail_y(4));
+  run(400);
+  swipe(200, 200, 200, 40, 300);
+  run(800);
+  settings_row(102);
+  run(1200);
+  snap("32_obd_settings_bluetooth");
+
+  ui::adapter_picker::open(core::AdapterTransport::Bluetooth);
+  run(2000);
+  snap("33_obd_scan_bluetooth");
+  tap(180, 4);  // backdrop
+  run(300);
+
+  // Fault codes over OBD: multi-frame mode 03, mode 07, NO DATA for mode 0A.
+  tap(kRailX, rail_y(2));
+  run(500);
+  tap(225, 63);
+  run_until([] { return core::vehicle().dtc.operation == core::DtcOperation::Idle; }, 10000);
+  wait_toast();
+  snap("34_obd_diag_codes");
+  check(v.dtc.last_result == core::DtcResult::ReadOk && v.dtc.count == 4, "4 fault codes read");
+  check(has_code(0x0301, core::DtcStatus::Stored) && has_code(0x0420, core::DtcStatus::Stored) &&
+            has_code(0x0128, core::DtcStatus::Stored),
+        "stored P0301 P0420 P0128 (multi-frame)");
+  check(has_code(0x0171, core::DtcStatus::Pending), "pending P0171");
+
+  tap(285, 63);
+  run(300);
+  tap(228, 168);
+  run_until([] { return core::vehicle().dtc.operation == core::DtcOperation::Idle; }, 20000);
+  check(v.dtc.last_result == core::DtcResult::ClearOk && v.dtc.count == 0 && !v.dtc.mil_on, "codes cleared (mode 04)");
+  wait_toast();
+
+  // Wi-Fi adapter.
+  select_adapter(core::AdapterTransport::Wifi);
+  ui::navigate(ui::PageId::Dashboard);
+  check(run_until(connected, 20000), "Wi-Fi adapter and vehicle connected");
+  run(3000);
+  snap("35_obd_dashboard_wifi");
+  ui::adapter_picker::open(core::AdapterTransport::Wifi);
+  run(2000);
+  snap("36_obd_scan_wifi");
+  tap(180, 4);
+  run(300);
+
+  // Back to the demo source.
+  core::settings::edit().demo_mode = true;
+  core::settings::commit(core::settings::kChangeDataSource);
+  check(!v.adapter_used && v.simulated, "demo source restored");
+  g_auto_ack = false;
+  run(300);
+}
+
 /** Short product tour recorded frame by frame for the README demo animation. */
 void demo_tour() {
   using namespace sim;
@@ -447,13 +660,19 @@ int main(int argc, char** argv) {
 
   snap("01_splash");
   core::link::set_active(&sim::g_link, sim::now());
+  core::settings::add_listener(sim::on_settings_changed, nullptr);
   ui::start(false);
   scenario();
+  obd_scenario();
 
   ui::open_touch_calibration();
   sim::run(300);
   snap("26_touch_calibration");
 
   printf("[sim] %d screenshots written to %s\n", sim::g_shots, sim::g_out_dir.c_str());
+  if (g_failures > 0) {
+    printf("[sim] %d check(s) FAILED\n", g_failures);
+    return 1;
+  }
   return 0;
 }

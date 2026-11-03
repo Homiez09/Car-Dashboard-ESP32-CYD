@@ -57,6 +57,10 @@ void sanitize(Settings& s) {
 
   for (auto& slot : s.corner_slots) slot = sanitize_enum(slot, SignalId::Count, SignalId::CoolantTemp);
   for (auto& slot : s.gauge_slots) slot = sanitize_enum(slot, SignalId::Count, SignalId::EngineLoad);
+
+  s.adapter = sanitize_enum(s.adapter, AdapterTransport::Count, d.adapter);
+  s.bt_name[kAdapterNameLen - 1] = '\0';
+  s.wifi_ssid[kAdapterNameLen - 1] = '\0';
 }
 
 void notify(uint32_t changes) {
@@ -88,7 +92,7 @@ Settings defaults() {
   s.alert_sound = true;
   s.volume = 60;
   s.status_led = true;
-  s.demo_mode = true;
+  s.demo_mode = false;
   s.dash_view = 0;
   s.corner_slots[0] = SignalId::CoolantTemp;
   s.corner_slots[1] = SignalId::BatteryVoltage;
@@ -100,6 +104,7 @@ Settings defaults() {
   s.gauge_slots[3] = SignalId::IntakeTemp;
   s.gauge_slots[4] = SignalId::TimingAdvance;
   s.gauge_slots[5] = SignalId::FuelRate;
+  s.adapter = AdapterTransport::Bluetooth;  // no adapter selected yet (empty name / SSID)
   return s;
 }
 

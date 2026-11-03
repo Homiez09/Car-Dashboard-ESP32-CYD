@@ -5,6 +5,51 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Real vehicle data through an **ELM327 OBD-II adapter** over **Bluetooth Classic** (SPP, PIN 1234 / 0000)
+  or **Wi-Fi** (open network, TCP port 35000 on the gateway / 192.168.0.10): live mode 01 PIDs, battery
+  voltage (ATRV), check engine status, reading (modes 03 / 07 / 0A) and clearing (mode 04) of fault codes.
+  Unsupported PIDs are detected (0100 / 0120 / 0140); without PID 5E the fuel rate is estimated from MAF.
+- *Settings → Connection*: data source Demo / Bluetooth / Wi-Fi, live adapter, vehicle (ECU) and OBD protocol
+  status. The adapter is **found automatically** (strongest device / open network named like an OBD adapter:
+  OBD, ELM, V-LINK, Vgate, Veepeak, ...) and remembered once connected; it can also be picked from a scan.
+- Bluetooth pairing tries PINs 1234, 0000, 6789, 1111, accepts Secure Simple Pairing, removes a stale pairing
+  after a failed round and asks unnamed (BT 2.0) devices for their name.
+- *Settings → About*: reason of the last restart (power on, brownout, crash, watchdog, ...).
+- Bluetooth is started at boot, before the UI takes its memory; selecting Bluetooth while running saves the
+  choice and restarts the device once. A remembered adapter is connected directly (no scan); scans for a new
+  one start 3 s after boot and are repeated at most every 30 s.
+- If Bluetooth / Wi-Fi resets the device (crash, watchdog, brownout), the next start falls back to demo mode
+  and reports the step (BT start / scan / connect, Wi-Fi join / scan / connect) and free memory (*About*).
+- Status bar: Bluetooth / Wi-Fi icon for the adapter link and a car icon for the vehicle link — blinking
+  while connecting, green when connected, red on an error.
+- Simulator: emulated ELM327 adapter and protocol checks (`[sim] PASS/FAIL`, non-zero exit on failure),
+  six new screenshots (30-36).
+
+### Removed
+- Demo mode on the device: the firmware always reads the car through the ELM327 adapter (Bluetooth or
+  Wi-Fi). The simulated car remains in the PC simulator. Settings stored with demo mode switch to Bluetooth.
+
+### Changed
+- After an error reset the device keeps its data source and reconnects; only after 3 failed boots in a row
+  is the radio paused for that run (tap Bluetooth / Wi-Fi in *Settings → Connection* to retry).
+- With Bluetooth / Wi-Fi running only the visible page is kept in memory (pages are rebuilt on each visit);
+  Bluetooth uses smaller draw buffers (2 × 10 KB).
+- **Partition scheme is now "Huge APP (3MB No OTA/1MB SPIFFS)"** (`PartitionScheme=huge_app`): the
+  Bluetooth and Wi-Fi stacks grow the firmware to ≈ 2.1 MB. Stored settings, calibration and trip data
+  are kept (same NVS location). OTA updates are not possible with both radios on 4 MB flash.
+- Settings format version 2 (adapter selection appended; older settings load unchanged).
+- The "ESP32 link" data source was replaced by Bluetooth and Wi-Fi.
+- The dashboard builds only its visible view (cluster or engine gauges); a swipe deletes the other view
+  before building the next one (about 40 % less memory for the dashboard).
+
+### Fixed
+- With Bluetooth running, changing pages restarted the device (out of memory): the next page was built
+  while the previous one was still in memory. The old page is now freed first, then the new one is built.
+- With Bluetooth running, opening *Live Data* restarted the device (and after 3 times paused the radio): it is
+  the largest page (a row per signal). Its rows now share styles instead of per-widget local styles, about
+  a quarter less memory. The serial log reports the free heap whenever a page is built.
+
 ## [1.1.0] - 2026-10-01
 
 ### Changed

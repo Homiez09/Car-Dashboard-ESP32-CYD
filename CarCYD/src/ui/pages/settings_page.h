@@ -53,6 +53,8 @@ class SettingsPage final : public Page {
   lv_obj_t* night_value_ = nullptr;
   lv_obj_t* volume_value_ = nullptr;
   lv_obj_t* link_status_ = nullptr;
+  lv_obj_t* adapter_status_ = nullptr;
+  lv_obj_t* protocol_label_ = nullptr;
   lv_obj_t* memory_label_ = nullptr;
   lv_obj_t* uptime_label_ = nullptr;
   lv_obj_t* accent_swatches_[5] = {};

@@ -8,6 +8,7 @@
 #include "../../core/settings.h"
 #include "../../core/units.h"
 #include "../../core/vehicle_state.h"
+#include "../components/adapter_picker.h"
 #include "../components/dialog.h"
 #include "../components/setting_rows.h"
 #include "../theme.h"
@@ -188,9 +189,13 @@ void on_status_led(lv_event_t* e) {
   commit(chg::kChangeLed);
 }
 void on_data_source(lv_event_t* e) {
-  edit().demo_mode = selected_segment(e) == 0;
+  // Bluetooth, Wi-Fi. Tapping the active one reconnects (also resumes a paused radio).
+  core::Settings& s = edit();
+  s.demo_mode = false;
+  s.adapter = static_cast<core::AdapterTransport>(selected_segment(e));
   commit(chg::kChangeDataSource);
 }
+void on_pick_adapter(lv_event_t*) { adapter_picker::open(get().adapter); }
 void on_language(lv_event_t* e) {
   const auto lang = static_cast<core::Language>(selected_segment(e));
   if (get().language == lang) return;
@@ -221,6 +226,28 @@ const char* link_state_text(core::LinkState state) {
     case core::LinkState::Disconnected:
     default: return core::tr(core::Str::LINK_DISCONNECTED);
   }
+}
+
+lv_color_t link_state_color(core::LinkState state) {
+  switch (state) {
+    case core::LinkState::Connected: return color::ok();
+    case core::LinkState::Error: return color::crit();
+    default: return color::text_dim();
+  }
+}
+
+/** OBD protocol name for an ELM327 protocol number (ATDPN). */
+const char* protocol_name(uint8_t protocol) {
+  static const char* const kNames[] = {
+      "--",           "SAE J1850 PWM",   "SAE J1850 VPW",  "ISO 9141-2",     "KWP2000 5 baud",
+      "KWP2000 fast", "CAN 11 bit 500k", "CAN 29 bit 500k", "CAN 11 bit 250k", "CAN 29 bit 250k",
+      "SAE J1939",    "CAN user 1",      "CAN user 2",
+  };
+  return protocol < sizeof(kNames) / sizeof(kNames[0]) ? kNames[protocol] : "--";
+}
+
+const char* adapter_glyph(core::AdapterTransport transport) {
+  return transport == core::AdapterTransport::Wifi ? ICON_WIFI : ICON_BLUETOOTH;
 }
 
 }  // namespace
@@ -275,7 +302,7 @@ void SettingsPage::refresh_summaries() {
   set_text(summaries_[static_cast<int>(Section::Sound)], buf);
 
   set_text(summaries_[static_cast<int>(Section::Connection)],
-           core::tr(s.demo_mode ? core::Str::SET_SRC_DEMO : core::Str::SET_SRC_LINK));
+           core::tr(s.adapter == core::AdapterTransport::Wifi ? core::Str::SET_SRC_WIFI : core::Str::SET_SRC_BLUETOOTH));
   set_text(summaries_[static_cast<int>(Section::System)], core::i18n::language_name(s.language));
   set_text(summaries_[static_cast<int>(Section::About)], "v" APP_VERSION);
 }
@@ -303,10 +330,15 @@ void SettingsPage::on_settings_changed(uint32_t changes) {
     built_rpm_max_ = get().rpm_max;
     lv_async_call(reopen_async, reinterpret_cast<void*>(static_cast<intptr_t>(section_)));
   }
+  // The connection rows depend on the data source and the selected adapter.
+  if (section_ == Section::Connection && (changes & (chg::kChangeDataSource | chg::kChangeAdapter))) {
+    lv_async_call(reopen_async, reinterpret_cast<void*>(static_cast<intptr_t>(section_)));
+  }
 }
 
 SettingsPage::~SettingsPage() {
   lv_async_call_cancel(reopen_async, reinterpret_cast<void*>(static_cast<intptr_t>(Section::Gauges)));
+  lv_async_call_cancel(reopen_async, reinterpret_cast<void*>(static_cast<intptr_t>(Section::Connection)));
   if (g_self == this) g_self = nullptr;
 }
 
@@ -356,7 +388,7 @@ void SettingsPage::close_section() {
     detail_ = nullptr;
   }
   ambient_label_ = night_row_ = day_title_ = brightness_value_ = night_value_ = nullptr;
-  volume_value_ = link_status_ = memory_label_ = uptime_label_ = nullptr;
+  volume_value_ = link_status_ = adapter_status_ = protocol_label_ = memory_label_ = uptime_label_ = nullptr;
   for (auto& swatch : accent_swatches_) swatch = nullptr;
   section_ = Section::None;
 }
@@ -384,11 +416,16 @@ void SettingsPage::update_live_values(uint32_t now_ms) {
     snprintf(buf, sizeof(buf), "%u%% · %u", platform::ambient_level(), platform::light_sensor_raw());
     set_text(ambient_label_, buf);
   }
+  const core::VehicleState& v = core::vehicle();
   if (link_status_ != nullptr) {
-    const core::LinkState state = core::vehicle().link_state;
-    set_text(link_status_, link_state_text(state));
-    set_text_color(link_status_, state == core::LinkState::Connected ? color::ok() : color::text_dim());
+    set_text(link_status_, link_state_text(v.link_state));
+    set_text_color(link_status_, link_state_color(v.link_state));
   }
+  if (adapter_status_ != nullptr) {
+    set_text(adapter_status_, link_state_text(v.adapter_state));
+    set_text_color(adapter_status_, link_state_color(v.adapter_state));
+  }
+  if (protocol_label_ != nullptr) set_text(protocol_label_, protocol_name(v.obd_protocol));
   if (memory_label_ != nullptr) {
     platform::SystemInfo info;
     platform::system_info(info);
@@ -512,13 +549,22 @@ void SettingsPage::build_sound(lv_obj_t* list) {
 }
 
 void SettingsPage::build_connection(lv_obj_t* list) {
-  g_sources[0] = core::tr(core::Str::SET_SRC_DEMO);
-  g_sources[1] = core::tr(core::Str::SET_SRC_LINK);
+  const core::Settings& s = get();
+  g_sources[0] = core::tr(core::Str::SET_SRC_BLUETOOTH);
+  g_sources[1] = core::tr(core::Str::SET_SRC_WIFI);
   g_sources[2] = nullptr;
-  rows::segmented(list, ICON_DATABASE, core::tr(core::Str::SET_DATA_SOURCE), g_sources, get().demo_mode ? 0 : 1,
-                  on_data_source, nullptr);
-  link_status_ = rows::info(list, ICON_LINK, core::tr(core::Str::SET_LINK_STATUS), "");
-  rows::note(list, core::tr(core::Str::SET_DEMO_HINT));
+  rows::segmented(list, ICON_DATABASE, core::tr(core::Str::SET_DATA_SOURCE), g_sources,
+                  static_cast<uint32_t>(s.adapter), on_data_source, nullptr);
+
+  const bool bluetooth = s.adapter == core::AdapterTransport::Bluetooth;
+  const bool selected_adapter = bluetooth ? s.bt_addr_valid : s.wifi_ssid[0] != '\0';
+  const char* name = bluetooth ? s.bt_name : s.wifi_ssid;
+  rows::nav(list, adapter_glyph(s.adapter), core::tr(core::Str::SET_ADAPTER),
+            selected_adapter ? name : core::tr(core::Str::SET_ADAPTER_AUTO), on_pick_adapter, nullptr);
+  adapter_status_ = rows::info(list, adapter_glyph(s.adapter), core::tr(core::Str::SET_ADAPTER_LINK), "");
+  link_status_ = rows::info(list, ICON_CAR, core::tr(core::Str::SET_VEHICLE_LINK), "");
+  protocol_label_ = rows::info(list, ICON_CHIP, core::tr(core::Str::SET_PROTOCOL), "--");
+  rows::note(list, core::tr(bluetooth ? core::Str::SET_BT_HINT : core::Str::SET_WIFI_HINT));
 }
 
 void SettingsPage::build_system(lv_obj_t* list) {
@@ -544,6 +590,8 @@ void SettingsPage::build_about(lv_obj_t* list) {
   rows::info(list, ICON_DATABASE, core::tr(core::Str::ABOUT_FLASH), buf);
   memory_label_ = rows::info(list, ICON_MEMORY, core::tr(core::Str::ABOUT_MEMORY), "");
   uptime_label_ = rows::info(list, ICON_TIMER, core::tr(core::Str::ABOUT_UPTIME), "");
+  rows::info(list, ICON_RESTART, core::tr(core::Str::ABOUT_RESET), info.reset_reason);
+  if (info.radio_report[0] != '\0') rows::info(list, ICON_BLUETOOTH, core::tr(core::Str::ABOUT_RADIO), info.radio_report);
   snprintf(buf, sizeof(buf), "LVGL %d.%d.%d", LVGL_VERSION_MAJOR, LVGL_VERSION_MINOR, LVGL_VERSION_PATCH);
   rows::info(list, ICON_PALETTE, core::tr(core::Str::ABOUT_GRAPHICS), buf);
 }

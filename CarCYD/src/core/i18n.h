@@ -180,11 +180,26 @@
   X(SET_STATUS_LED_SUB,   "Shift light and warnings",       "Vites ışığı ve uyarılar") \
   /* ---- Settings: connection -------------------------------------------- */ \
   X(SET_DATA_SOURCE,      "Data source",                    "Veri kaynağı") \
-  X(SET_SRC_DEMO,         "Demo",                           "Demo") \
-  X(SET_SRC_LINK,         "ESP32 link",                     "ESP32 bağlantısı") \
-  X(SET_LINK_STATUS,      "Status",                         "Durum") \
-  X(SET_LINK_INTERFACE,   "Interface",                      "Arayüz") \
-  X(SET_DEMO_HINT,        "Demo mode simulates a driving car. Select ESP32 link to use real vehicle data.", "Demo modu sürüşü simüle eder. Gerçek araç verisi için ESP32 bağlantısını seçin.") \
+  X(SET_SRC_BLUETOOTH,    "Bluetooth",                      "Bluetooth") \
+  X(SET_SRC_WIFI,         "Wi-Fi",                          "Wi-Fi") \
+  X(SET_ADAPTER,          "OBD adapter",                    "OBD adaptörü") \
+  X(SET_ADAPTER_AUTO,     "Automatic",                      "Otomatik") \
+  X(SET_ADAPTER_LINK,     "Adapter",                        "Adaptör") \
+  X(SET_VEHICLE_LINK,     "Vehicle (ECU)",                  "Araç (ECU)") \
+  X(SET_PROTOCOL,         "Protocol",                       "Protokol") \
+  X(SET_BT_HINT,          "Plug the adapter in and switch the ignition on. CarCYD finds it automatically (names like OBD, ELM, V-LINK) and pairs with PIN 1234, 0000, 6789 or 1111. Not found? Tap OBD adapter and pick it.", "Adaptörü takın ve kontağı açın. CarCYD adaptörü otomatik bulur (OBD, ELM, V-LINK gibi adlar) ve 1234, 0000, 6789 veya 1111 PIN'i ile eşleşir. Bulunamazsa OBD adaptörüne dokunup seçin.") \
+  X(SET_WIFI_HINT,        "Plug the adapter in and switch the ignition on. CarCYD joins the adapter's open network automatically (names like WiFi_OBDII, V-LINK), port 35000. Not found? Tap OBD adapter and pick it.", "Adaptörü takın ve kontağı açın. CarCYD adaptörün şifresiz ağına otomatik bağlanır (WiFi_OBDII, V-LINK gibi adlar), port 35000. Bulunamazsa OBD adaptörüne dokunup seçin.") \
+  X(SCAN_TITLE_BT,        "Bluetooth devices",              "Bluetooth cihazları") \
+  X(SCAN_TITLE_WIFI,      "Wi-Fi networks",                 "Wi-Fi ağları") \
+  X(SCAN_RUNNING,         "Searching…",                     "Aranıyor…") \
+  X(SCAN_EMPTY,           "No adapter found. Check that it is powered and try again.", "Adaptör bulunamadı. Adaptörün güç aldığını kontrol edip tekrar deneyin.") \
+  X(SCAN_AGAIN,           "Scan again",                     "Tekrar ara") \
+  X(SCAN_AUTO_DONE,       "Searching for an OBD adapter",   "OBD adaptörü aranıyor") \
+  X(RADIO_SAFE,           "Bluetooth / Wi-Fi paused",       "Bluetooth / Wi-Fi durduruldu") \
+  X(RESTART_FOR_BT,       "Restarting to start Bluetooth",  "Bluetooth için yeniden başlatılıyor") \
+  X(RADIO_SAFE_TEXT,      "Failed 3 times (%s %s). Tap Bluetooth or Wi-Fi in Settings to retry", "3 kez başarısız (%s %s). Tekrar denemek için Ayarlar'da Bluetooth veya Wi-Fi'ye dokunun") \
+  X(SCAN_SECURED,         "Password protected networks are not supported", "Şifreli ağlar desteklenmiyor") \
+  X(FMT_CONNECTING_TO,    "Connecting to %s",               "%s bağlantısı kuruluyor") \
   X(LINK_CONNECTED,       "Connected",                      "Bağlı") \
   X(LINK_CONNECTING,      "Connecting…",                    "Bağlanıyor…") \
   X(LINK_DISCONNECTED,    "Not connected",                  "Bağlı değil") \
@@ -205,6 +220,8 @@
   X(ABOUT_FLASH,          "Flash",                          "Flash") \
   X(ABOUT_MEMORY,         "Free memory",                    "Boş bellek") \
   X(ABOUT_UPTIME,         "Uptime",                         "Çalışma süresi") \
+  X(ABOUT_RESET,          "Last restart",                   "Son yeniden başlatma") \
+  X(ABOUT_RADIO,          "During",                         "Sırasında") \
   X(ABOUT_GRAPHICS,       "Graphics",                       "Grafik") \
   /* ---- Touch calibration ----------------------------------------------- */ \
   X(CAL_TITLE,            "Touch calibration",              "Dokunmatik kalibrasyonu") \
