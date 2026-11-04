@@ -39,6 +39,10 @@ void set_active(DataLink* next, uint32_t now_ms) {
   state.invalidate_all();
   state.dtc = DtcState{};
   state.dtc.revision = 1;
+  state.adapter_used = false;
+  state.adapter_state = LinkState::Disconnected;
+  state.obd_protocol = 0;
+  state.stale_after_ms = kSignalStaleMs;
 
   g_active = next;
   if (g_active != nullptr) {

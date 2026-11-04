@@ -33,7 +33,9 @@ sizes.
 
 - **Navigation rail** on the driver side (left): large touch targets, accent bar on the active page, attention
   badge on Diagnostics.
-- **Status bar**: page title / back arrow; on the right check engine, alert, DEMO, link and clock.
+- **Status bar**: page title / back arrow; on the right check engine, alert, DEMO, adapter (Bluetooth /
+  Wi-Fi), vehicle (car) and clock. Connection icons blink amber while connecting, are green when connected
+  and red on an error; the adapter icon is hidden in demo mode.
 - **Grid**: outer padding 8 px, gap between cards 6 px, card radius 10 px, row height 44 px.
 
 ## Colours

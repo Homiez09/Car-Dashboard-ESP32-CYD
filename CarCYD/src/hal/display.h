@@ -9,8 +9,11 @@
 
 namespace hal::display {
 
-/** Initialises the panel and creates the LVGL display. Returns null on failure. */
-lv_display_t* init(bool flipped);
+/**
+ * Initialises the panel and creates the LVGL display with draw buffers of `lines`
+ * rows (fewer if memory is short). Returns null on failure.
+ */
+lv_display_t* init(bool flipped, uint16_t lines);
 
 /** Rotates the picture by 180 degrees (e.g. for an upside-down mounting). */
 void set_flipped(bool flipped);

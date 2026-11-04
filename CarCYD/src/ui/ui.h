@@ -39,6 +39,12 @@ void start(bool run_touch_calibration);
 
 // ---- Navigation --------------------------------------------------------------------------
 void navigate(PageId page);
+
+/**
+ * Low-memory mode (a radio is running): pages are deleted when left and rebuilt on the
+ * next visit instead of being kept, so only one page uses memory at a time.
+ */
+void set_keep_pages(bool keep);
 PageId current_page();
 
 /** Opens the touch calibration screen; returns to the current page afterwards. */

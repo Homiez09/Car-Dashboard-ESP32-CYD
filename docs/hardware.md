@@ -26,7 +26,7 @@
 | Speaker amplifier input | 26 | "SPEAK" JST connector, LEDC tone generation |
 | SD card SCK / MISO / MOSI / CS | 18 / 19 / 23 / 5 | VSPI (SPI3) — reserved for data logging |
 | BOOT button | 0 | LOW = pressed |
-| CN1 connector | 22, 27 | 3.3 V, GND, IO22, IO27 → reserved for the vehicle interface UART |
+| CN1 connector | 22, 27 | 3.3 V, GND, IO22, IO27 → free (e.g. for a UART) |
 | P3 connector | 35, 22, 21 | IO35 is input only; IO21 is shared with the backlight! |
 | P1 (serial) | 1 / 3 | TX / RX (shared with the USB serial bridge) |
 
@@ -112,3 +112,22 @@ board by day and at night and update the two constants.
 - Keep the display out of direct sunlight on the dashboard; the panel heats up quickly.
 - The RGB LED is on the back of the board and gives a background glow for the shift light and warnings. All
   warnings are always shown on screen as well; the LED can be disabled in *Settings → Sound & light*.
+
+## ELM327 OBD-II adapter
+
+The CYD has no CAN / K-Line hardware; it reads the car through an ELM327 adapter plugged into the OBD-II
+port (*Settings → Connection*).
+
+| Adapter type | Works | Notes |
+|---|---|---|
+| Bluetooth Classic (e.g. "OBDII", "V-LINK", most v1.5 / v2.1 clones) | yes | Found automatically by name; PINs 1234, 0000, 6789, 1111 and Secure Simple Pairing |
+| Wi-Fi (e.g. "WiFi_OBDII", "V-LINK") | yes | Open network found automatically by name; TCP to the gateway address (usually 192.168.0.10), port 35000 |
+| Bluetooth LE only (iOS adapters such as OBDLink CX) | no | Not supported by this firmware |
+
+- Many adapters stay powered with the ignition off and drain the battery slowly; unplug them when the car is
+  parked for long periods.
+- With the ignition off the adapter connects (Bluetooth / Wi-Fi icon green) but the ECU does not answer
+  (car icon blinking); CarCYD retries every 4 s.
+- If the screen resets when Bluetooth or Wi-Fi starts, check *Settings → About → Last restart*: "Brownout"
+  means the supply sags when the radio switches on — use a short USB cable / a 5 V 2 A supply.
+- Only one radio is used at a time. Firmware size requires the **Huge APP (3MB No OTA)** partition scheme.

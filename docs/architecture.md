@@ -27,11 +27,14 @@
 
 ## Execution model
 
-Everything runs cooperatively in the Arduino `loop()` task. LVGL is not thread safe, so there are no extra
-tasks or locks. The main loop:
+Everything runs cooperatively in the Arduino `loop()` task. LVGL is not thread safe, so nothing else touches
+the UI or the core state. The only other tasks are the radio workers of the OBD adapter transports
+(`hal/obd_*.cpp`): Bluetooth / Wi-Fi connects and scans block inside the ESP32 libraries for seconds, so
+they run there and hand results back through atomics; the main loop only polls `state()` and moves bytes.
+The main loop:
 
 ```
-link.poll()            data source (demo: fixed-step model at 20 Hz)
+link.poll()            data source (ELM327: one OBD request in flight; simulator: simulated car at 20 Hz)
 alerts.update()        limit evaluation, debouncing, hysteresis
 trip.update()          distance / time / fuel integration, 0-100 timer
 alert sounds, LED      new or escalated alerts, shift light
@@ -47,7 +50,7 @@ No step blocks: speaker melodies, LED patterns and backlight fades all advance w
 ## Data flow
 
 ```
-DataLink (SimLink / NullLink / later: ESP32 link)
+DataLink (SimLink / Elm327Link over Bluetooth or Wi-Fi / NullLink)
    │ set(SignalId, value, now)      DTC read/clear results, link state, clock
    ▼
 VehicleState ──► AlertManager ──► banner / sound / LED
@@ -56,22 +59,45 @@ VehicleState ──► AlertManager ──► banner / sound / LED
 UI pages (only the visible page is updated)
 ```
 
-- Every signal value carries a timestamp; a value not refreshed for 2.5 s is **stale** and shown as "--".
+- Every signal value carries a timestamp; a value not refreshed for 2.5 s (8 s for the ELM327 link, which
+  polls slow-changing PIDs every 3-5 s) is **stale** and shown as "--" (`VehicleState::stale_after_ms`).
 - Limits are defined in one place (`core/signals.cpp` → `limits()`): value colouring and alerts use the same
   function.
 - DTC operations are asynchronous: `link::request_dtc_read()` → `DtcState.operation` → result in
   `DtcState.last_result` plus an incremented `revision`. The UI watches the revision number.
 
-## Adding a data source (the ESP32 vehicle link)
+## The ELM327 link
 
-1. Write a class derived from `core::DataLink` (e.g. `hal/esp32_link.cpp`, UART or ESP-NOW).
-2. In `poll()`, decode incoming frames and call `state.set(SignalId::Rpm, value, now)`; keep
+```
+core/elm327_link.cpp   ELM327 protocol (portable, also runs in the simulator)
+   │ ObdTransport (core/obd_transport.h): open / close / state / read / write
+   ├── hal/obd_bluetooth.cpp   Bluetooth Classic SPP (BluetoothSerial, PIN 1234 then 0000)
+   └── hal/obd_wifi.cpp        Wi-Fi station → TCP gateway:35000 (fallback 192.168.0.10)
+```
+
+Phases: adapter connect → `ATZ ATE0 ATL0 ATS0 ATH0 ATAT1 ATSP0` → `0100` (protocol search; no answer =
+ignition off, retried every 4 s) → `ATDPN`, `0120`, `0140` (supported PIDs) → polling. The scheduler always
+sends the most overdue supported PID (rpm / speed every 250 ms, temperatures every 3 s, ...); a PID answering
+`NO DATA` three times is dropped until the next connection. `ATRV` supplies the battery voltage, `0101` the
+check engine light. Without PID 5E the fuel rate is estimated from MAF. DTC requests run `0101 03 07 0A`
+(preceded by `04` to clear) between polls; ISO-TP multi-frame replies are reassembled.
+
+`VehicleState` reports the two connections separately: `adapter_state` (radio link to the adapter, shown by
+the Bluetooth / Wi-Fi status icon) and `link_state` (ECU answers, shown by the car icon). Only one radio is
+powered at a time (`hal::obd::use()`). The adapter is chosen in *Settings → Connection* from a scan
+(`platform::adapter_scan_*()`) and stored in `Settings` (`bt_addr` / `wifi_ssid`).
+
+## Adding a data source
+
+1. Write a class derived from `core::DataLink`. Keep protocol logic in `core/` and put hardware access behind
+   an interface implemented in `hal/` (like `ObdTransport`), so the simulator can run it.
+2. In `poll()`, decode incoming data and call `state.set(SignalId::Rpm, value, now)`; keep
    `state.link_state` up to date (including a connection timeout).
-3. Forward `request_dtc_read/clear()` to the interface and write the result into `state.dtc`
+3. Execute `request_dtc_read/clear()` and write the result into `state.dtc`
    (`operation` → `Idle`, `last_result`, `revision++`).
-4. In `app.cpp` → `select_data_source()`, use the new class instead of `NullLink` when `demo_mode == false`.
+4. Select it in `app.cpp` → `select_data_source()`.
 
-The UI, the alerts and the trip computer need no changes. Connector CN1 (IO22 / IO27) is reserved for a UART.
+The UI, the alerts and the trip computer need no changes. Connector CN1 (IO22 / IO27) is free for a UART.
 
 ## Adding a signal
 
@@ -102,8 +128,8 @@ defaults. Corrupt data (CRC) falls back to the defaults. Every settings field is
 
 | Resource | Value |
 |---|---|
-| Flash (firmware) | ≈ 770 KB of 1.25 MB (default partition scheme, OTA ready) |
-| Static RAM | ≈ 26 KB |
+| Flash (firmware) | ≈ 2.1 MB of 3 MB ("Huge APP" partition scheme; Bluetooth + Wi-Fi stacks ≈ 1.35 MB, no OTA) |
+| Static RAM | ≈ 69 KB |
 | LVGL draw buffers | 2 × 320×40×2 B = 50 KB, DMA capable internal RAM |
 | LVGL objects | pages are created on first visit, sub-pages are deleted when closed |
 | Display transfer | `RGB565_SWAPPED` → DMA without conversion; LVGL renders into one buffer while the other is sent |

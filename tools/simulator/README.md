@@ -5,6 +5,10 @@ headless: a virtual clock and scripted touch input walk through every screen and
 Use it to review design changes without flashing the board and as a UI smoke test. The screenshots, the demo
 animation and the banner in the main README are produced with it.
 
+The tour also connects to an emulated ELM327 adapter (Bluetooth and Wi-Fi) and checks the OBD-II protocol
+code: response parsing, live values against the vehicle model, fault code read / clear. Each check prints
+`[sim] PASS` or `[sim] FAIL`; any failure makes `build.py` exit with an error.
+
 ## Requirements
 
 - Python 3.9+ and Pillow (`pip install pillow`)
@@ -33,7 +37,8 @@ The first build compiles about 500 files including LVGL; later builds are increm
 | File | Purpose |
 |---|---|
 | `sim_main.cpp` | In-memory LVGL display and input driver, virtual clock, scenarios, frame capture |
-| `sim_platform.cpp` | PC implementation of `core/platform.h` |
+| `sim_platform.cpp` | PC implementation of `core/platform.h` (incl. a fixed list of scanned adapters) |
+| `sim_elm.cpp` | Emulated ELM327 adapter (CAN car, multi-frame DTC reply) driven by the demo vehicle model |
 | `build.py` | Parallel incremental build, run, PNG conversion, overview sheet |
 | `media.py` | Demo GIF assembly (with touch markers) and banner rendering |
 

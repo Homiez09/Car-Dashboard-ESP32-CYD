@@ -38,13 +38,33 @@ void StatusBar::create(lv_obj_t* parent, lv_event_cb_t on_back, void* user) {
   mil_ = icon(root_, ICON_ENGINE, font::title(), color::warn());
   alert_ = icon(root_, ICON_ALERT, font::title(), color::warn());
   demo_ = chip(root_, "DEMO", color::accent());
-  link_ = icon(root_, ICON_LINK_OFF, font::title(), color::text_faint());
+  adapter_ = icon(root_, ICON_BLUETOOTH, font::title(), color::text_faint());
+  vehicle_ = icon(root_, ICON_CAR, font::title(), color::text_faint());
   clock_ = label(root_, font::title(), color::text(), "");
 
   set_visible(mil_, false);
   set_visible(alert_, false);
   set_visible(demo_, false);
+  set_visible(adapter_, false);
   set_visible(clock_, false);
+}
+
+void StatusBar::show_link(lv_obj_t* icon_obj, core::LinkState state) const {
+  switch (state) {
+    case core::LinkState::Connected:
+      set_text_color(icon_obj, color::ok());
+      break;
+    case core::LinkState::Connecting:
+      set_text_color(icon_obj, blink_ ? color::warn() : color::text_faint());
+      break;
+    case core::LinkState::Error:
+      set_text_color(icon_obj, color::crit());
+      break;
+    case core::LinkState::Disconnected:
+    default:
+      set_text_color(icon_obj, color::text_faint());
+      break;
+  }
 }
 
 void StatusBar::set_title(const char* title) { set_text(title_, title); }
@@ -69,25 +89,12 @@ void StatusBar::update(uint32_t now_ms) {
     set_text_color(alert_, dim ? color::text_faint() : color::severity(alert));
   }
 
-  switch (v.link_state) {
-    case core::LinkState::Connected:
-      set_text(link_, ICON_LINK);
-      set_text_color(link_, color::ok());
-      break;
-    case core::LinkState::Connecting:
-      set_text(link_, ICON_LINK);
-      set_text_color(link_, blink_ ? color::warn() : color::text_faint());
-      break;
-    case core::LinkState::Error:
-      set_text(link_, ICON_LINK_OFF);
-      set_text_color(link_, color::crit());
-      break;
-    case core::LinkState::Disconnected:
-    default:
-      set_text(link_, ICON_LINK_OFF);
-      set_text_color(link_, color::text_faint());
-      break;
+  set_visible(adapter_, v.adapter_used);
+  if (v.adapter_used) {
+    set_text(adapter_, v.adapter == core::AdapterTransport::Wifi ? ICON_WIFI : ICON_BLUETOOTH);
+    show_link(adapter_, v.adapter_state);
   }
+  show_link(vehicle_, v.link_state);
 
   set_visible(demo_, v.simulated);
 

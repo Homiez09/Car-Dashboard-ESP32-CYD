@@ -35,6 +35,8 @@ bool pickable_for_gauge(core::SignalId id) {
 
 const char* DashboardPage::title() const { return core::tr(core::Str::PAGE_DASHBOARD); }
 
+DashboardPage::~DashboardPage() { lv_async_call_cancel(switch_async, this); }
+
 void DashboardPage::create(lv_obj_t* parent) {
   root_ = box(parent);
   lv_obj_set_size(root_, lv_pct(100), lv_pct(100));
@@ -43,42 +45,6 @@ void DashboardPage::create(lv_obj_t* parent) {
   // the first ancestor that does not bubble further).
   lv_obj_set_gesture_bubble(root_, false);
   lv_obj_add_event_cb(root_, gesture_cb, LV_EVENT_GESTURE, this);
-
-  // ---- View 0: cluster -----------------------------------------------------------------
-  views_[0] = box(root_);
-  lv_obj_set_size(views_[0], lv_pct(100), lv_pct(100));
-  lv_obj_set_gesture_bubble(views_[0], true);
-
-  ring_.create(views_[0], kRingDiameter);
-  lv_obj_center(ring_.root());
-
-  const lv_align_t corners[core::kCornerSlots] = {LV_ALIGN_TOP_LEFT, LV_ALIGN_TOP_RIGHT, LV_ALIGN_BOTTOM_LEFT,
-                                                  LV_ALIGN_BOTTOM_RIGHT};
-  for (uint8_t i = 0; i < core::kCornerSlots; ++i) {
-    const bool right = (i % 2) == 1;
-    tiles_[i].create(views_[0], right);
-    lv_obj_align(tiles_[i].root(), corners[i], right ? -6 : 6, i < 2 ? 6 : -6);
-    lv_obj_set_gesture_bubble(tiles_[i].root(), true);
-    lv_obj_add_event_cb(tiles_[i].root(), tile_long_press_cb, LV_EVENT_LONG_PRESSED,
-                        reinterpret_cast<void*>(static_cast<intptr_t>(i)));
-    lv_obj_set_user_data(tiles_[i].root(), this);
-  }
-
-  // ---- View 1: engine gauges -------------------------------------------------------------
-  views_[1] = box(root_);
-  lv_obj_set_size(views_[1], lv_pct(100), lv_pct(100));
-  lv_obj_set_style_pad_top(views_[1], 8, 0);
-  lv_obj_set_style_pad_row(views_[1], 10, 0);
-  lv_obj_set_flex_flow(views_[1], LV_FLEX_FLOW_ROW_WRAP);
-  lv_obj_set_flex_align(views_[1], LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-  lv_obj_set_gesture_bubble(views_[1], true);
-  for (uint8_t i = 0; i < core::kGaugeSlots; ++i) {
-    gauges_[i].create(views_[1], 86, 80);
-    lv_obj_set_gesture_bubble(gauges_[i].root(), true);
-    lv_obj_add_event_cb(gauges_[i].root(), gauge_long_press_cb, LV_EVENT_LONG_PRESSED,
-                        reinterpret_cast<void*>(static_cast<intptr_t>(i)));
-    lv_obj_set_user_data(gauges_[i].root(), this);
-  }
 
   // ---- Page indicator ------------------------------------------------------------------
   lv_obj_t* dots = row(root_, 8);
@@ -94,15 +60,62 @@ void DashboardPage::create(lv_obj_t* parent) {
     lv_obj_add_event_cb(dots_[i], dot_cb, LV_EVENT_CLICKED, this);
   }
 
-  apply_settings();
   show_view(core::settings::get().dash_view, false);
+}
+
+void DashboardPage::build_view(uint8_t view) {
+  if (views_[view] != nullptr) return;
+  lv_obj_t* v = box(root_);
+  views_[view] = v;
+  lv_obj_set_size(v, lv_pct(100), lv_pct(100));
+  lv_obj_set_gesture_bubble(v, true);
+  lv_obj_move_to_index(v, 0);  // below the page dots
+
+  if (view == 0) {
+    // ---- View 0: cluster -----------------------------------------------------------------
+    ring_ = RingGauge{};
+    ring_.create(v, kRingDiameter);
+    lv_obj_center(ring_.root());
+
+    const lv_align_t corners[core::kCornerSlots] = {LV_ALIGN_TOP_LEFT, LV_ALIGN_TOP_RIGHT, LV_ALIGN_BOTTOM_LEFT,
+                                                    LV_ALIGN_BOTTOM_RIGHT};
+    for (uint8_t i = 0; i < core::kCornerSlots; ++i) {
+      const bool right = (i % 2) == 1;
+      tiles_[i] = StatTile{};
+      tiles_[i].create(v, right);
+      lv_obj_align(tiles_[i].root(), corners[i], right ? -6 : 6, i < 2 ? 6 : -6);
+      lv_obj_set_gesture_bubble(tiles_[i].root(), true);
+      lv_obj_add_event_cb(tiles_[i].root(), tile_long_press_cb, LV_EVENT_LONG_PRESSED,
+                          reinterpret_cast<void*>(static_cast<intptr_t>(i)));
+      lv_obj_set_user_data(tiles_[i].root(), this);
+    }
+  } else {
+    // ---- View 1: engine gauges -------------------------------------------------------------
+    lv_obj_set_style_pad_top(v, 8, 0);
+    lv_obj_set_style_pad_row(v, 10, 0);
+    lv_obj_set_flex_flow(v, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_flex_align(v, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    for (uint8_t i = 0; i < core::kGaugeSlots; ++i) {
+      gauges_[i] = MiniGauge{};
+      gauges_[i].create(v, 86, 80);
+      lv_obj_set_gesture_bubble(gauges_[i].root(), true);
+      lv_obj_add_event_cb(gauges_[i].root(), gauge_long_press_cb, LV_EVENT_LONG_PRESSED,
+                          reinterpret_cast<void*>(static_cast<intptr_t>(i)));
+      lv_obj_set_user_data(gauges_[i].root(), this);
+    }
+  }
+  apply_settings();
 }
 
 void DashboardPage::apply_settings() {
   const core::Settings& s = core::settings::get();
-  ring_.configure(s.rpm_max, s.redline_rpm, s.shift_rpm, s.shift_light);
-  for (uint8_t i = 0; i < core::kCornerSlots; ++i) tiles_[i].set_signal(s.corner_slots[i]);
-  for (uint8_t i = 0; i < core::kGaugeSlots; ++i) gauges_[i].set_signal(s.gauge_slots[i]);
+  if (views_[0] != nullptr) {
+    ring_.configure(s.rpm_max, s.redline_rpm, s.shift_rpm, s.shift_light);
+    for (uint8_t i = 0; i < core::kCornerSlots; ++i) tiles_[i].set_signal(s.corner_slots[i]);
+  }
+  if (views_[1] != nullptr) {
+    for (uint8_t i = 0; i < core::kGaugeSlots; ++i) gauges_[i].set_signal(s.gauge_slots[i]);
+  }
   last_slow_update_ms_ = 0;
 }
 
@@ -116,15 +129,23 @@ void DashboardPage::on_show() {
   static bool swept = false;
   if (!swept) {
     swept = true;
-    ring_.start_sweep(platform::millis());
+    if (views_[0] != nullptr) ring_.start_sweep(platform::millis());
   }
   last_slow_update_ms_ = 0;
 }
 
+/**
+ * Only the visible view exists (memory is tight with a radio running): the other one is
+ * deleted first, then this one is built.
+ */
 void DashboardPage::show_view(uint8_t view, bool persist) {
   view_ = view > 1 ? 0 : view;
-  set_visible(views_[0], view_ == 0);
-  set_visible(views_[1], view_ == 1);
+  const uint8_t other = view_ == 0 ? 1 : 0;
+  if (views_[other] != nullptr) {
+    lv_obj_delete(views_[other]);
+    views_[other] = nullptr;
+  }
+  build_view(view_);
   for (uint8_t i = 0; i < 2; ++i) {
     lv_obj_set_style_bg_color(dots_[i], i == view_ ? color::accent() : color::text_faint(), 0);
   }
@@ -133,6 +154,19 @@ void DashboardPage::show_view(uint8_t view, bool persist) {
     core::settings::edit().dash_view = view_;
     core::settings::commit(core::settings::kChangeLayout);
   }
+}
+
+/** Swipes and dot taps switch outside the input event: the view being deleted may be its target. */
+void DashboardPage::request_view(uint8_t view) {
+  lv_async_call_cancel(switch_async, this);  // a newer swipe wins
+  if (view == view_) return;
+  pending_view_ = view;
+  lv_async_call(switch_async, this);
+}
+
+void DashboardPage::switch_async(void* p) {
+  auto* self = static_cast<DashboardPage*>(p);
+  self->show_view(self->pending_view_, true);
 }
 
 void DashboardPage::update(uint32_t now_ms) {
@@ -170,16 +204,16 @@ void DashboardPage::gesture_cb(lv_event_t* e) {
   auto* self = static_cast<DashboardPage*>(lv_event_get_user_data(e));
   const lv_dir_t dir = lv_indev_get_gesture_dir(lv_indev_active());
   if (dir == LV_DIR_LEFT && self->view_ == 0) {
-    self->show_view(1, true);
+    self->request_view(1);
   } else if (dir == LV_DIR_RIGHT && self->view_ == 1) {
-    self->show_view(0, true);
+    self->request_view(0);
   }
 }
 
 void DashboardPage::dot_cb(lv_event_t* e) {
   auto* self = static_cast<DashboardPage*>(lv_event_get_user_data(e));
   lv_obj_t* dot = lv_event_get_current_target_obj(e);
-  self->show_view(dot == self->dots_[1] ? 1 : 0, true);
+  self->request_view(dot == self->dots_[1] ? 1 : 0);
 }
 
 void DashboardPage::tile_long_press_cb(lv_event_t* e) {

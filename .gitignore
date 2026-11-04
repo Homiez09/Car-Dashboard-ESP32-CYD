@@ -18,3 +18,6 @@ Thumbs.db
 # Python / Node
 __pycache__/
 node_modules/
+
+# Claude Code personal settings
+.claude/settings.local.json

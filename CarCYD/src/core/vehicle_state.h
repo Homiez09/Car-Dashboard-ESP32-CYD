@@ -13,7 +13,7 @@
 
 namespace core {
 
-/** A value is considered stale (shown as "--") when not refreshed for this long. */
+/** Default age after which a value is stale (shown as "--"); see VehicleState::stale_after_ms. */
 constexpr uint32_t kSignalStaleMs = 2500;
 
 struct SignalValue {
@@ -67,9 +67,17 @@ class VehicleState {
 
   bool engine_running(uint32_t now_ms) const;
 
-  // Link status (written by the data link).
+  // Link status (written by the data link). `link_state` is the connection to
+  // the vehicle (ECU); `adapter_state` the radio link to the OBD adapter.
   LinkState link_state = LinkState::Disconnected;
   bool simulated = false;
+  bool adapter_used = false;  ///< false for sources without an adapter (demo)
+  AdapterTransport adapter = AdapterTransport::Bluetooth;
+  LinkState adapter_state = LinkState::Disconnected;
+  uint8_t obd_protocol = 0;  ///< ELM327 protocol number (ATDPN), 0 = unknown
+
+  /** Age after which a value counts as stale; slow sources (OBD polling) raise it. */
+  uint32_t stale_after_ms = kSignalStaleMs;
 
   // Wall clock supplied by the vehicle interface (minutes since midnight).
   bool clock_valid = false;

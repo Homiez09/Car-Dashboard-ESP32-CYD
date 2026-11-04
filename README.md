@@ -7,15 +7,15 @@
 # CarCYD — ESP32 Car Dashboard for the Cheap Yellow Display
 
 **Turn a ~$15 ESP32-2432S028R "Cheap Yellow Display" into a digital gauge cluster and OBD-II diagnostic screen.**<br>
-Open-source firmware built with LVGL 9 and the Arduino IDE: tachometer and speedometer, live engine data with charts, a fault code reader, a trip computer and driver alerts. A built-in demo mode drives a simulated car, so everything works the minute you flash it.
+Open-source firmware built with LVGL 9 and the Arduino IDE: tachometer and speedometer, live engine data with charts, a fault code reader, a trip computer and driver alerts. It reads the car through a cheap ELM327 OBD-II adapter over Bluetooth or Wi-Fi.
 
 <p>
-  <a href="https://github.com/muki01/Car-Dashboard-ESP32-CYD/stargazers"><img alt="GitHub stars" height="28" src="https://img.shields.io/github/stars/muki01/Car-Dashboard-ESP32-CYD?style=flat&logo=github&logoColor=white&label=Stars&labelColor=1f2328&color=0891b2"></a>
-  <a href="https://github.com/muki01/Car-Dashboard-ESP32-CYD/network/members"><img alt="GitHub forks" height="28" src="https://img.shields.io/github/forks/muki01/Car-Dashboard-ESP32-CYD?style=flat&logo=github&logoColor=white&label=Forks&labelColor=1f2328&color=2563eb"></a>
-  <a href="https://github.com/muki01/Car-Dashboard-ESP32-CYD/issues"><img alt="GitHub issues" height="28" src="https://img.shields.io/github/issues/muki01/Car-Dashboard-ESP32-CYD?style=flat&logo=github&logoColor=white&label=Issues&labelColor=1f2328&color=6366f1"></a>
+  <a href="https://github.com/Homiez09/Car-Dashboard-ESP32-CYD/stargazers"><img alt="GitHub stars" height="28" src="https://img.shields.io/github/stars/Homiez09/Car-Dashboard-ESP32-CYD?style=flat&logo=github&logoColor=white&label=Stars&labelColor=1f2328&color=0891b2"></a>
+  <a href="https://github.com/Homiez09/Car-Dashboard-ESP32-CYD/network/members"><img alt="GitHub forks" height="28" src="https://img.shields.io/github/forks/Homiez09/Car-Dashboard-ESP32-CYD?style=flat&logo=github&logoColor=white&label=Forks&labelColor=1f2328&color=2563eb"></a>
+  <a href="https://github.com/Homiez09/Car-Dashboard-ESP32-CYD/issues"><img alt="GitHub issues" height="28" src="https://img.shields.io/github/issues/Homiez09/Car-Dashboard-ESP32-CYD?style=flat&logo=github&logoColor=white&label=Issues&labelColor=1f2328&color=6366f1"></a>
   <a href="LICENSE"><img alt="GPL-3.0 license" height="28" src="https://img.shields.io/badge/License-GPL--3.0-16a34a?style=flat&logo=opensourceinitiative&logoColor=white&labelColor=1f2328"></a>
-  <a href="https://github.com/muki01/Car-Dashboard-ESP32-CYD/releases/latest"><img alt="Latest release" height="28" src="https://img.shields.io/github/v/release/muki01/Car-Dashboard-ESP32-CYD?style=flat&logo=github&logoColor=white&label=Release&labelColor=1f2328&color=9333ea"></a>
-  <a href="https://github.com/muki01/Car-Dashboard-ESP32-CYD/actions/workflows/build.yml"><img alt="Build status" height="28" src="https://img.shields.io/github/actions/workflow/status/muki01/Car-Dashboard-ESP32-CYD/build.yml?style=flat&logo=githubactions&logoColor=white&label=Build&labelColor=1f2328"></a>
+  <a href="https://github.com/Homiez09/Car-Dashboard-ESP32-CYD/releases/latest"><img alt="Latest release" height="28" src="https://img.shields.io/github/v/release/Homiez09/Car-Dashboard-ESP32-CYD?style=flat&logo=github&logoColor=white&label=Release&labelColor=1f2328&color=9333ea"></a>
+  <a href="https://github.com/Homiez09/Car-Dashboard-ESP32-CYD/actions/workflows/build.yml"><img alt="Build status" height="28" src="https://img.shields.io/github/actions/workflow/status/Homiez09/Car-Dashboard-ESP32-CYD/build.yml?style=flat&logo=githubactions&logoColor=white&label=Build&labelColor=1f2328"></a>
 </p>
 
 <p>
@@ -33,12 +33,16 @@ Open-source firmware built with LVGL 9 and the Arduino IDE: tachometer and speed
 
 ## 📌 Overview
 
-**CarCYD** is an open-source **car dashboard firmware** for the **ESP32 Cheap Yellow Display** (CYD, **ESP32-2432S028R**, 2.8" 320×240 touchscreen). It is built with **LVGL 9** and the **Arduino IDE** and turns the board into a digital **gauge cluster** with a tachometer and speedometer, **live OBD-II data** with charts, a **DTC fault code reader** with one-tap clear, a **trip computer**, smart **driver alerts** and more than 25 settings.
+**CarCYD** is an open-source **car dashboard firmware** for the **ESP32 Cheap Yellow Display** (CYD, **ESP32-2432S028R**, 2.8" 320×240 touchscreen). It is built with **LVGL 9** and the **Arduino IDE** and turns the board into a digital **gauge cluster** with a tachometer and speedometer, **live OBD-II data** from an **ELM327 adapter** (Bluetooth / Wi-Fi) with charts, a **DTC fault code reader** with one-tap clear, a **trip computer**, smart **driver alerts** and more than 25 settings.
 
 It was designed and engineered like a commercial automotive HMI: clean layered architecture, DMA display driver, persistent settings, touch calibration, auto-brightness, localization and a PC simulator.
 
 > [!NOTE]
-> **No car? No problem.** A built-in demo mode simulates a car being driven — cold start, gear shifts, warnings and stored fault codes — so everything works the minute you flash it. The connection to a real vehicle is the next step on the [roadmap](#-roadmap); the [FAQ](#-faq) explains why the board cannot read the OBD-II port on its own.
+> This is a fork of [muki01/Car-Dashboard-ESP32-CYD](https://github.com/muki01/Car-Dashboard-ESP32-CYD) by
+> Muksin Muksin. It adds reading a real car through an **ELM327 OBD-II adapter** over Bluetooth Classic or Wi-Fi.
+
+> **No car at hand?** The PC simulator renders every screen with a simulated car (cold start, gear shifts,
+> warnings, stored fault codes) — see [Develop the UI on your PC](#%EF%B8%8F-develop-the-ui-on-your-pc). The firmware itself always reads the car through an ELM327 adapter.
 
 ## 🎬 Demo
 
@@ -57,6 +61,7 @@ It was designed and engineered like a commercial automotive HMI: clean layered a
 | 🏎️ **Gauge cluster** | 270° tachometer ring with red zone, digital speed, gear indicator, flashing **shift light**, start-up needle sweep |
 | 📊 **Two dashboard views** | Cluster with four corner values, or six mini gauges — swipe to switch, **long-press to customize** any value |
 | 📈 **Live data** | 18 engine signals with severity colors; tap for a real-time **chart with min / avg / max** |
+| 🔌 **ELM327 OBD-II adapter** | Real car data over **Bluetooth** or **Wi-Fi**: scan and pick the adapter in the settings, automatic protocol detection, live PIDs, battery voltage; status bar icons for the adapter and vehicle link |
 | 🔧 **OBD-II diagnostics** | Check-engine (MIL) status, **read & clear DTCs**, stored / pending / permanent codes, descriptions for 92 common codes, severity and advice |
 | 🚨 **Driver alerts** | Coolant, oil, battery low/high, fuel, speed limit, check engine, link lost — debounced, with hysteresis, on-screen banner, sound and LED |
 | 🧭 **Trip computer** | Distance, drive time, average / max speed, fuel used, average consumption and a **0-100 km/h (0-60 mph) timer** |
@@ -116,13 +121,13 @@ All 29 screens: [English](images/screenshots/en) · [Turkish UI](images/screensh
 | USB cable | Micro-USB or USB-C depending on the board |
 | Small 8 Ω speaker *(optional)* | JST 1.25 mm "SPEAK" connector for alert sounds |
 | 12 V → 5 V automotive converter *(in the car)* | Load-dump protected; see the [hardware notes](docs/hardware.md#in-car-installation) |
-| Vehicle interface *(coming)* | A second ESP32 with a CAN / OBD-II front end — see the [roadmap](#-roadmap) |
+| ELM327 OBD-II adapter *(for real car data)* | Bluetooth Classic ("OBDII", "V-LINK", ...; PIN 1234 / 0000 / 6789 / 1111 tried automatically) or Wi-Fi ("WiFi_OBDII", open network) — BLE-only adapters are not supported |
 
 ## 🚀 Quick Start
 
 ### Flash a prebuilt firmware (no IDE needed)
 
-Every [release](https://github.com/muki01/Car-Dashboard-ESP32-CYD/releases/latest) ships ready-to-flash images:
+Every [release](https://github.com/Homiez09/Car-Dashboard-ESP32-CYD/releases/latest) ships ready-to-flash images:
 
 | Your board | Release file |
 | :-- | :-- |
@@ -149,7 +154,8 @@ Command line alternative: `pip install esptool`, then `esptool --chip esp32 writ
    | micro-USB **and** USB-C | `CYD_PANEL_ILI9341_2` and `CYD_PANEL_INVERT 1` *(repository default)* |
    | 2-USB board with ST7789 | `CYD_PANEL_ST7789` and `CYD_PANEL_INVERT 0` |
 
-5. **Tools menu:** Board *ESP32 Dev Module*, Partition Scheme *Default 4MB with spiffs*, PSRAM *Disabled*.
+5. **Tools menu:** Board *ESP32 Dev Module*, Partition Scheme **Huge APP (3MB No OTA/1MB SPIFFS)**, PSRAM *Disabled*.
+   The Bluetooth and Wi-Fi stacks do not fit the default 1.25 MB app partition ("Sketch too big").
 6. **Upload.** On the first start a short touch calibration runs (tap four targets). Done.
 
 ### arduino-cli
@@ -157,27 +163,32 @@ Command line alternative: `pip install esptool`, then `esptool --chip esp32 writ
 ```bash
 arduino-cli core install esp32:esp32 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
 arduino-cli lib install "lvgl@9.6.0" "LovyanGFX"
-arduino-cli compile --fqbn esp32:esp32:esp32 CarCYD
-arduino-cli upload  --fqbn esp32:esp32:esp32 -p COM5 CarCYD   # your serial port
+arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=huge_app CarCYD
+arduino-cli upload  --fqbn esp32:esp32:esp32:PartitionScheme=huge_app -p COM5 CarCYD   # your serial port
 ```
 
-The firmware uses about **770 KB flash** and **26 KB static RAM** and builds with zero warnings.
+The firmware uses about **2.1 MB flash** (Bluetooth + Wi-Fi stacks) and **69 KB static RAM** and builds with zero warnings.
 
 ## 🎮 Using It
 
 - **Navigation rail** (left): Dashboard · Live data · Diagnostics · Trip · Settings.
 - **Dashboard:** swipe left/right (or tap the dots) to switch views; **long-press** a value to replace it.
 - **Alerts:** tap the banner to acknowledge. Critical alerts repeat their sound until acknowledged.
-- **BOOT button:** short press = acknowledge alert / next page · long press = back to the dashboard · hold during power-up = touch calibration.
-- **Data source:** *Settings → Connection* switches between **Demo** and the **ESP32 link**.
+- **BOOT button:** short press = acknowledge alert / next page · long press = back to the dashboard ·
+  hold during power-up = touch calibration.
+- **Real car:** plug the ELM327 adapter in, switch the ignition on, then *Settings → Connection* → choose
+  **Bluetooth** or **Wi-Fi**. The adapter is found automatically (any vendor whose name looks like an OBD
+  adapter) and remembered; if yours has an unusual name, tap *OBD adapter* and pick it from the scan list.
+  Status bar: the Bluetooth / Wi-Fi icon is the adapter link, the car icon the link to the engine ECU —
+  blinking = connecting, green = connected, red = error.
 
 ## 🧩 Architecture
 
 ```mermaid
 flowchart LR
     subgraph Vehicle data
-        SIM[Demo simulator] --> LINK{{DataLink}}
-        ESP[ESP32 vehicle link<br/><i>coming soon</i>] -.-> LINK
+        SIM[Simulated car<br/><i>PC simulator</i>] -.-> LINK{{DataLink}}
+        ELM[ELM327 link<br/>Bluetooth · Wi-Fi] --> LINK
     end
     LINK --> STATE[(Vehicle state)]
     STATE --> ALERTS[Alert manager]
@@ -195,7 +206,9 @@ flowchart LR
 - **`ui/`** — LVGL pages and reusable components built on a small design system (`theme.h`).
 - **`app/`** — composition root and the cooperative main loop.
 
-Adding the real vehicle connection means implementing **one class** (`core::DataLink`); the UI, alerts and trip computer need no changes. Read more in [docs/architecture.md](docs/architecture.md) and the [UI guidelines](docs/ui-guidelines.md).
+Data sources implement **one class** (`core::DataLink`): the ELM327 link and, in the PC simulator, a simulated car (protocol in
+`core/`, Bluetooth / Wi-Fi transports in `hal/`); the UI, alerts and trip computer need no changes. Read more in [docs/architecture.md](docs/architecture.md) and the
+[UI guidelines](docs/ui-guidelines.md).
 
 <details>
 <summary><b>Project structure</b></summary>
@@ -236,11 +249,11 @@ See [tools/simulator](tools/simulator/README.md). Fonts and icons are regenerate
 ## 🚧 Roadmap
 
 - [x] Gauge cluster, live data, diagnostics, trip computer, alerts, settings
-- [x] Demo mode, touch calibration, auto brightness, localization, PC simulator
-- [ ] **Vehicle link:** second ESP32 with CAN / OBD-II over UART (CN1) or ESP-NOW
+- [x] Touch calibration, auto brightness, localization, PC simulator with a simulated car
+- [x] **Vehicle link:** ELM327 OBD-II adapter over Bluetooth Classic or Wi-Fi
 - [ ] Freeze-frame data and readiness monitors
 - [ ] Data logging to the micro SD card (CSV)
-- [ ] OTA updates (the default partition scheme is already OTA ready)
+- [ ] OTA updates (needs a single-radio build: Bluetooth + Wi-Fi do not fit two OTA slots in 4 MB)
 - [ ] PlatformIO project file
 - [ ] More languages — contributions welcome!
 
@@ -251,7 +264,10 @@ See [tools/simulator](tools/simulator/README.md). Fonts and icons are regenerate
 
 <br>
 
-No. The board has no CAN transceiver or K-Line interface. CarCYD is designed to receive vehicle data from a separate interface (for example a second ESP32 with a CAN transceiver) through the `DataLink` abstraction. Until that link exists, the demo mode shows exactly how everything behaves.
+Not by wire — the board has no CAN transceiver or K-Line interface. Plug a cheap **ELM327** adapter into the
+car's OBD-II port and CarCYD reads it wirelessly over **Bluetooth Classic** or **Wi-Fi** (*Settings →
+Connection*). All OBD-II protocols the adapter supports (CAN, KWP2000, ISO 9141, J1850) work; the protocol is
+detected automatically.
 
 </details>
 
@@ -301,7 +317,7 @@ Third-party licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.
 
 Contributions, bug reports and feature ideas are welcome — new languages, gauge styles, board variants and the vehicle link in particular. Please read the **[Contributing Guide](CONTRIBUTING.md)** and the **[Code of Conduct](CODE_OF_CONDUCT.md)** first. For UI changes, attach simulator screenshots to your pull request.
 
-Questions and build photos are welcome in [Discussions](https://github.com/muki01/Car-Dashboard-ESP32-CYD/discussions). Security problems go to the **[Security Policy](SECURITY.md)**, not to a public issue.
+Questions and build photos are welcome in [Discussions](https://github.com/Homiez09/Car-Dashboard-ESP32-CYD/discussions). Security problems go to the **[Security Policy](SECURITY.md)**, not to a public issue.
 
 ## 🔗 Related Projects
 

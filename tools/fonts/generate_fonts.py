@@ -147,6 +147,10 @@ ICONS = [
     ("CHIP", "chip", 0xF061A),
     ("MEMORY", "memory", 0xF035B),
     ("DATABASE", "database", 0xF01BC),
+    # Vehicle adapter (ELM327)
+    ("BLUETOOTH", "bluetooth", 0xF00AF),
+    ("WIFI", "wifi", 0xF05A9),
+    ("LOCK", "lock", 0xF033E),
 ]
 
 # Large icons used for empty states and the splash screen.

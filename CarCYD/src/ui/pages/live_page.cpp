@@ -38,6 +38,63 @@ void nice_range(float lo, float hi, int32_t& out_lo, int32_t& out_hi) {
   if (out_hi <= out_lo) out_hi = out_lo + 1;
 }
 
+/**
+ * The list has a row per signal (~90 objects): shared styles instead of local ones per
+ * object keep it small enough to be built next to the Bluetooth stack.
+ */
+struct RowStyles {
+  lv_style_t row, row_pressed, icon, name, value, unit;
+  bool ready = false;
+};
+RowStyles g_styles;
+
+/** (Re)applies the theme tokens; the colours may have changed since the last visit. */
+void init_row_styles() {
+  RowStyles& st = g_styles;
+  if (!st.ready) {
+    lv_style_t* const styles[] = {&st.row, &st.row_pressed, &st.icon, &st.name, &st.value, &st.unit};
+    for (lv_style_t* style : styles) lv_style_init(style);
+    st.ready = true;
+  }
+  lv_style_set_width(&st.row, lv_pct(100));
+  lv_style_set_height(&st.row, 40);
+  lv_style_set_bg_color(&st.row, color::card());
+  lv_style_set_bg_opa(&st.row, LV_OPA_COVER);
+  lv_style_set_radius(&st.row, layout::kRadius);
+  lv_style_set_pad_hor(&st.row, 10);
+  lv_style_set_pad_column(&st.row, 8);
+  lv_style_set_layout(&st.row, LV_LAYOUT_FLEX);
+  lv_style_set_flex_flow(&st.row, LV_FLEX_FLOW_ROW);
+  lv_style_set_flex_main_place(&st.row, LV_FLEX_ALIGN_START);
+  lv_style_set_flex_cross_place(&st.row, LV_FLEX_ALIGN_CENTER);
+  lv_style_set_flex_track_place(&st.row, LV_FLEX_ALIGN_CENTER);
+  lv_style_set_bg_color(&st.row_pressed, color::card_hi());
+
+  lv_style_set_width(&st.icon, 22);
+  lv_style_set_text_font(&st.icon, font::value());
+  lv_style_set_text_color(&st.icon, color::accent());
+
+  lv_style_set_height(&st.name, lv_font_get_line_height(font::body()));  // single_line()
+  lv_style_set_flex_grow(&st.name, 1);
+  lv_style_set_text_font(&st.name, font::body());
+  lv_style_set_text_color(&st.name, color::text());
+
+  lv_style_set_text_font(&st.value, font::value());
+  lv_style_set_text_color(&st.value, color::text());
+  lv_style_set_text_align(&st.value, LV_TEXT_ALIGN_RIGHT);
+
+  lv_style_set_width(&st.unit, 34);
+  lv_style_set_text_font(&st.unit, font::caption());
+  lv_style_set_text_color(&st.unit, color::text_dim());
+}
+
+lv_obj_t* styled_label(lv_obj_t* parent, lv_style_t* style, const char* text) {
+  lv_obj_t* obj = lv_label_create(parent);
+  lv_obj_add_style(obj, style, 0);
+  lv_label_set_text_static(obj, text);
+  return obj;
+}
+
 }  // namespace
 
 const char* LivePage::title() const { return core::tr(core::Str::PAGE_LIVE); }
@@ -49,31 +106,26 @@ void LivePage::create(lv_obj_t* parent) {
   list_ = rows::list(root_);
   lv_obj_set_style_pad_row(list_, 4, 0);
 
+  init_row_styles();
+  RowStyles& st = g_styles;
   for (uint8_t i = 0; i < core::kSignalCount; ++i) {
     const auto id = static_cast<core::SignalId>(i);
-    lv_obj_t* r = card(list_);
-    lv_obj_set_size(r, lv_pct(100), 40);
-    lv_obj_set_style_pad_ver(r, 0, 0);
-    lv_obj_set_style_pad_hor(r, 10, 0);
-    lv_obj_set_flex_flow(r, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(r, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(r, 8, 0);
-    lv_obj_set_clickable(r, true);
-    lv_obj_set_style_bg_color(r, color::card_hi(), LV_STATE_PRESSED);
+    lv_obj_t* r = lv_obj_create(list_);
+    lv_obj_remove_style_all(r);
+    lv_obj_add_style(r, &st.row, 0);
+    lv_obj_add_style(r, &st.row_pressed, LV_STATE_PRESSED);
+    lv_obj_set_scrollable(r, false);
     lv_obj_set_user_data(r, this);
     lv_obj_add_event_cb(r, row_clicked_cb, LV_EVENT_CLICKED, reinterpret_cast<void*>(static_cast<intptr_t>(i)));
     add_touch_feedback(r);
 
-    lv_obj_t* ic = icon(r, signal_icon(id), font::value(), color::accent());
-    lv_obj_set_width(ic, 22);
-    lv_obj_t* name = label(r, font::body(), color::text(), core::tr(core::signal_info(id).name));
-    lv_obj_set_flex_grow(name, 1);
-    single_line(name);
+    styled_label(r, &st.icon, signal_icon(id));
+    lv_obj_t* name = styled_label(r, &st.name, "");
+    lv_label_set_long_mode(name, LV_LABEL_LONG_MODE_DOTS);
+    lv_label_set_text(name, core::tr(core::signal_info(id).name));  // dots need a writable copy
 
-    rows_[i].value = label(r, font::value(), color::text(), kNoValue);
-    lv_obj_set_style_text_align(rows_[i].value, LV_TEXT_ALIGN_RIGHT, 0);
-    rows_[i].unit = label(r, font::caption(), color::text_dim(), "");
-    lv_obj_set_width(rows_[i].unit, 34);
+    rows_[i].value = styled_label(r, &st.value, kNoValue);
+    rows_[i].unit = styled_label(r, &st.unit, "");
   }
 }
 

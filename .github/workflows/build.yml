@@ -23,7 +23,7 @@ jobs:
       - name: Compile CarCYD (ESP32 Dev Module)
         uses: arduino/compile-sketches@v1
         with:
-          fqbn: esp32:esp32:esp32
+          fqbn: esp32:esp32:esp32:PartitionScheme=huge_app
           platforms: |
             - name: esp32:esp32
               source-url: https://espressif.github.io/arduino-esp32/package_esp32_index.json

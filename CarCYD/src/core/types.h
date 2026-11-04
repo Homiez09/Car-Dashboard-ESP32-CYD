@@ -60,4 +60,7 @@ enum class Accent : uint8_t { Cyan = 0, Amber, Red, Green, Violet, Count };
 /** State of the connection to the vehicle interface. */
 enum class LinkState : uint8_t { Disconnected = 0, Connecting, Connected, Error };
 
+/** Radio used to reach the ELM327 OBD-II adapter. */
+enum class AdapterTransport : uint8_t { Bluetooth = 0, Wifi, Count };
+
 }  // namespace core

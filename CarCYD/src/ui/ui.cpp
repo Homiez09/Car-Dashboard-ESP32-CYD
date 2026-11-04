@@ -38,12 +38,15 @@ struct Shell {
   StatusBar status;
   NavRail rail;
   Page* pages[kPageCount] = {};
+  Page* released[kPageCount] = {};  // left pages waiting to be freed (low-memory mode)
   PageId current = PageId::Dashboard;
   lv_timer_t* timer = nullptr;
   uint32_t alert_revision = 0;
   uint32_t dtc_revision = 0;
   bool started = false;
   bool rebuild_pending = false;
+  bool keep_pages = true;
+  bool release_pending = false;
 };
 
 Shell g;
@@ -57,6 +60,62 @@ Page* make_page(PageId id) {
     case PageId::Settings:
     default: return new SettingsPage();
   }
+}
+
+void show_current();
+
+/** Deletes the widgets, then the object, of every released page. */
+void free_released() {
+  for (Page*& p : g.released) {
+    if (p == nullptr) continue;
+    if (p->root() != nullptr) lv_obj_delete(p->root());
+    delete p;
+    p = nullptr;
+  }
+}
+
+bool has_released() {
+  for (const Page* p : g.released) {
+    if (p != nullptr) return true;
+  }
+  return false;
+}
+
+void released_async(void*) {
+  g.release_pending = false;
+  free_released();
+  // The next page is only built now: with a radio running there is no memory for two pages.
+  if (g.pages[static_cast<int>(g.current)] == nullptr) show_current();
+}
+
+/** Frees a hidden page. Deferred: navigate() may run inside one of its event callbacks. */
+void release_page(PageId id) {
+  Page*& p = g.pages[static_cast<int>(id)];
+  if (p == nullptr) return;
+  g.released[static_cast<int>(id)] = p;
+  p = nullptr;
+  if (!g.release_pending) {
+    g.release_pending = true;
+    lv_async_call(released_async, nullptr);
+  }
+}
+
+Page* page(PageId id);
+
+void show_current() {
+  const bool build = g.pages[static_cast<int>(g.current)] == nullptr;
+  Page* p = page(g.current);
+  if (build) {
+    platform::SystemInfo info;
+    platform::system_info(info);
+    LOG_I("UI", "page %d built, heap free %lu B (min %lu B)", static_cast<int>(g.current),
+          static_cast<unsigned long>(info.heap_free), static_cast<unsigned long>(info.heap_min_free));
+  }
+  set_visible(p->root(), true);
+  g.status.set_title(p->title());
+  g.status.show_back(false);
+  p->on_show();
+  p->update(platform::millis());
 }
 
 Page* page(PageId id) {
@@ -129,7 +188,8 @@ void tick_cb(lv_timer_t*) {
     g.rail.set_badge(PageId::Diagnostics, attention || dtc.count > 0, attention ? color::warn() : color::info());
   }
 
-  g.pages[static_cast<int>(g.current)]->update(now);
+  Page* p = g.pages[static_cast<int>(g.current)];
+  if (p != nullptr) p->update(now);  // null while the previous page is being freed
 }
 
 // ---- Construction ----------------------------------------------------------------------------
@@ -176,6 +236,7 @@ void rebuild_async(void*) {
   const PageId current = g.current;
   const int state = g.pages[static_cast<int>(current)] ? g.pages[static_cast<int>(current)]->save_state() : -1;
 
+  free_released();  // before their parent (the old screen) goes
   theme_apply(g.display);
   lv_obj_t* old_screen = g.screen;
   for (auto& p : g.pages) {
@@ -198,7 +259,8 @@ void rebuild_async(void*) {
 
 void calibration_done() {
   lv_screen_load(g.screen);
-  g.pages[static_cast<int>(g.current)]->on_show();
+  Page* p = g.pages[static_cast<int>(g.current)];
+  if (p != nullptr) p->on_show();
 }
 
 }  // namespace
@@ -237,18 +299,27 @@ void navigate(PageId id) {
     previous->on_back();  // leave sub-views
     previous->on_hide();
     set_visible(previous->root(), false);
+    if (!g.keep_pages) {
+      dialog::close();  // a sheet may belong to the page
+      release_page(g.current);
+    }
   }
   g.current = id;
-  Page* p = page(id);
-  set_visible(p->root(), true);
   g.rail.set_active(id);
-  g.status.set_title(p->title());
-  g.status.show_back(false);
-  p->on_show();
-  p->update(platform::millis());
+  // The new page is built once the old one is freed (released_async()).
+  if (has_released() && g.pages[static_cast<int>(id)] == nullptr) return;
+  show_current();
 }
 
 PageId current_page() { return g.current; }
+
+void set_keep_pages(bool keep) {
+  g.keep_pages = keep;
+  if (keep) return;
+  for (int i = 0; i < kPageCount; ++i) {
+    if (static_cast<PageId>(i) != g.current) release_page(static_cast<PageId>(i));
+  }
+}
 
 void open_touch_calibration() { calibration::start(calibration_done); }
 
