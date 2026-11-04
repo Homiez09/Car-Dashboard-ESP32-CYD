@@ -25,9 +25,9 @@ rm -f build/CarCYD.ino.elf build/CarCYD.ino.map
 
 # Headless PC simulator (runs core/ + ui/ with the same lv_conf.h and fonts). Doubles as the test suite:
 # it drives an emulated ELM327 (tools/simulator/sim_elm.cpp) and prints [sim] PASS/FAIL; any FAIL -> exit 1
-python tools/simulator/build.py --zig /path/to/zig            # screenshots -> docs/screenshots/en
+python tools/simulator/build.py --zig /path/to/zig            # screenshots -> images/screenshots/en
 python tools/simulator/build.py --zig /path/to/zig --lang tr  # Turkish UI
-python tools/simulator/build.py --zig /path/to/zig --demo --banner   # docs/media/demo.gif + banner.png
+python tools/simulator/build.py --zig /path/to/zig --demo --banner   # images/demo.gif + social-preview.png
 python tools/simulator/build.py --cc gcc --cxx g++            # without zig
 #   needs Pillow; LVGL source from --lvgl / LVGL_DIR (default ~/Documents/Arduino/libraries/lvgl)
 
