@@ -4,24 +4,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-CarCYD is Arduino/C++17 firmware for the ESP32-2432S028R "Cheap Yellow Display" (320×240 touch): an LVGL 9 car dashboard (gauge cluster, live OBD-II data, DTC reader, trip computer, alerts, settings). The sketch is `CarCYD/CarCYD.ino`, which only calls `app::setup()` / `app::loop()`. Dependencies: esp32 Arduino core 3.x, lvgl 9.6+, LovyanGFX 1.2+. The firmware reads the car only through an ELM327 OBD-II adapter over Bluetooth Classic / Wi-Fi (`core/elm327_link.cpp` + `hal/obd_*.cpp`); there is no demo mode on the device. The simulated car (`core/sim_link.cpp`, `Settings::demo_mode`) is used by the PC simulator only.
+CarHUD is Arduino/C++17 firmware for the LCDWiki ESP32-S3 ES3C28P (ILI9341V 240×320 display, FT6336G capacitive touch): an LVGL 9 car dashboard with OBD-II data, diagnostics, trip computer, alerts and settings. The sketch is CarHUD/CarHUD.ino. Dependencies: ESP32 Arduino core 3.2.1, LVGL 9.6.0 and LovyanGFX 1.2.36. Wi-Fi OBD-II uses TCP; the BLE GATT transport remains pending confirmation of the adapter profile.
 
 ## Commands
 
 ```bash
-# Firmware build (must stay warning-free; CI builds all three panel variants).
-# PartitionScheme=huge_app is required: BT + Wi-Fi stacks make the image ~2.1 MB ("Sketch too big" otherwise).
-FQBN=esp32:esp32:esp32:PartitionScheme=huge_app
-arduino-cli compile --fqbn $FQBN --warnings all CarCYD
+# Firmware build for LCDWiki ESP32-S3 ES3C28P.
+# Use the ES3C28P 16 MB flash / OPI PSRAM profile and the app3M_fat9M_16MB partition scheme.
+FQBN="esp32:esp32:esp32s3:FlashSize=16M,PSRAM=opi,PartitionScheme=app3M_fat9M_16MB"
+arduino-cli compile --fqbn $FQBN --warnings all CarHUD
 arduino-cli compile --fqbn $FQBN --warnings all \
-  --build-property compiler.cpp.extra_flags=-DCYD_PANEL=3 CarCYD   # 1=ILI9341, 2=ILI9341_2 (default), 3=ST7789
-arduino-cli upload --fqbn $FQBN -p <port> CarCYD
+  --build-property compiler.cpp.extra_flags=-DCYD_PANEL=3 CarHUD   # 1=ILI9341, 2=ILI9341_2 (default), 3=ST7789
+arduino-cli upload --fqbn $FQBN -p <port> CarHUD
 
 # Flashable images go to ./build (the user flashes from there, not from the arduino-cli cache).
-# The merged image (bootloader + partitions + app, flash at 0x0) is renamed per panel variant:
-arduino-cli compile --fqbn $FQBN --warnings all --output-dir build CarCYD
-mv build/CarCYD.ino.merged.bin build/CarCYD-<version>-CYD2USB-ILI9341.bin   # CYD_PANEL=2 (default)
-rm -f build/CarCYD.ino.elf build/CarCYD.ino.map
+# The merged image (bootloader + partitions + app) is ready to flash at 0x0:
+arduino-cli compile --fqbn $FQBN --warnings all --output-dir build CarHUD
+cp build/CarHUD.ino.merged.bin firmware-output/CarHUD.ino.merged.bin
+rm -f build/CarHUD.ino.elf build/CarHUD.ino.map
 
 # Headless PC simulator (runs core/ + ui/ with the same lv_conf.h and fonts). Doubles as the test suite:
 # it drives an emulated ELM327 (tools/simulator/sim_elm.cpp) and prints [sim] PASS/FAIL; any FAIL -> exit 1
@@ -39,13 +39,13 @@ There is no separate unit-test framework; verification = warning-free compile + 
 
 ## Architecture
 
-Layers under `CarCYD/src/` (see `docs/architecture.md` for the full picture):
+Layers under `CarHUD/src/` (see `docs/architecture.md` for the full picture):
 
 - `core/` — platform-independent logic: `VehicleState`, signal metadata/limits, `AlertManager`, `TripComputer`, DTC database, settings, units, i18n, persistence format. **Must not include `Arduino.h`, LVGL, or hardware headers.** Hardware expectations are declared in `core/platform.h`.
 - `ui/` — LVGL pages (`ui/pages/`, derived from `ui::Page`), reusable components (`ui/components/`), `theme.h` design tokens, generated fonts. Reaches hardware **only** via `core/platform.h` — that is what lets the same UI code compile in the simulator (`tools/simulator/sim_platform.cpp` is the PC implementation of `platform.h`; `hal/platform_esp32.cpp` is the device one).
-- `hal/` — drivers only (LovyanGFX display + XPT2046 touch on software SPI, backlight PWM, LDR, buzzer, RGB LED, BOOT button, NVS, OBD adapter radios). No business rules.
-- `app/` — composition root and cooperative main loop; nothing depends on it. `select_data_source()` in `app.cpp` picks `Elm327Link` with the Bluetooth / Wi-Fi transport (or `NullLink` when the radio is paused after 3 failed boots in a row), and powers the unused radio down. Bluetooth is started in `setup()` between the display buffers and the UI (memory); switching to it at runtime restarts the device. With a radio running, `ui::set_keep_pages(false)` keeps only the visible page in memory.
-- `config/` — `board_config.h` (pins, `CYD_PANEL`/`CYD_PANEL_INVERT` variant selection), `app_config.h` (version, timing tunables).
+- `hal/` — drivers only (LovyanGFX ILI9341V display + FT6336G touch on I2C, backlight PWM, BOOT button, NVS, OBD adapter radios). No business rules.
+- `app/` — composition root and cooperative main loop; nothing depends on it. `select_data_source()` in `app.cpp` picks `Elm327Link` with the Bluetooth / Wi-Fi transport (or `NullLink` when the radio is paused after 3 failed boots in a row), and powers the unused radio down. The BLE transport is a placeholder until the ELM327 adapter GATT profile is confirmed; Wi-Fi TCP is the active radio transport. With a radio running, `ui::set_keep_pages(false)` keeps only the visible page in memory.
+- `config/` — `board_config.h` (ES3C28P GPIO and peripheral map), `app_config.h` (version, timing tunables).
 
 Key cross-cutting behaviour:
 
@@ -70,8 +70,8 @@ Key cross-cutting behaviour:
 
 ## Rules and conventions
 
-- Never hand-edit `CarCYD/src/ui/fonts/*` — they are generated by `tools/fonts/generate_fonts.py`.
-- `CarCYD/lv_conf.h` lives in the sketch folder and is found via `__has_include`; don't move it into the libraries folder.
+- Never hand-edit `CarHUD/src/ui/fonts/*` — they are generated by `tools/fonts/generate_fonts.py`.
+- `CarHUD/lv_conf.h` lives in the sketch folder and is found via `__has_include`; don't move it into the libraries folder.
 - No hard-coded colours/sizes in UI — use `ui/theme.h` tokens (see `docs/ui-guidelines.md`: colour signals state only, 40 px min touch targets, steppers over sliders, destructive actions need a confirm dialog).
 - Style: `.clang-format` (Google-based, 120 cols). Types `PascalCase`, functions/vars `snake_case`, constants `kPascalCase`, members end with `_`. Public headers start with a `@file` block.
 - Commits use Conventional Commits (`feat(ui): ...`, `fix(touch): ...`). Update `CHANGELOG.md` (*Unreleased*) and docs when behaviour changes.

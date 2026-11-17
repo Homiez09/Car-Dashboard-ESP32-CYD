@@ -4,7 +4,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ CarCYD.ino  →  app::setup() / app::loop()                        │
+│ CarHUD.ino  →  app::setup() / app::loop()                        │
 ├─────────────────────────────────────────────────────────────────┤
 │ app/        Composition root: creates the drivers, data source   │
 │             and storage and wires them to core and ui            │
@@ -71,7 +71,7 @@ UI pages (only the visible page is updated)
 ```
 core/elm327_link.cpp   ELM327 protocol (portable, also runs in the simulator)
    │ ObdTransport (core/obd_transport.h): open / close / state / read / write
-   ├── hal/obd_bluetooth.cpp   Bluetooth Classic SPP (BluetoothSerial, PIN 1234 then 0000)
+   ├── hal/obd_bluetooth.cpp   BLE GATT transport (adapter-specific profile; pending integration)
    └── hal/obd_wifi.cpp        Wi-Fi station → TCP gateway:35000 (fallback 192.168.0.10)
 ```
 

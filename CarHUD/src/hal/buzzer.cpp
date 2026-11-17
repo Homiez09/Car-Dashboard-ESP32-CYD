@@ -43,6 +43,7 @@ uint32_t g_step_end = 0;
 uint8_t g_volume = 60;
 
 void output(uint16_t hz) {
+  if (board::kSpeaker < 0) return;
   if (hz == 0 || g_volume == 0) {
     ledcWrite(board::kSpeaker, 0);
     return;
@@ -62,6 +63,7 @@ void start_step(uint32_t now_ms) {
 }  // namespace
 
 void init() {
+  if (board::kSpeaker < 0) return;
   // Unique frequency/resolution so the speaker gets its own LEDC timer.
   ledcAttachChannel(board::kSpeaker, kIdleFrequency, kPwmBits, board::kLedcSpeaker);
   ledcWrite(board::kSpeaker, 0);

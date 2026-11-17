@@ -1,133 +1,53 @@
-# Hardware: ESP32-2432S028R ("Cheap Yellow Display")
+# CarHUD hardware: LCDWiki ESP32-S3 ES3C28P
 
-## Overview
+CarHUD targets the LCDWiki ES3C28P 2.8-inch ESP32-S3 board.
 
-| Component | Details |
+## Main hardware
+
+- MCU: ESP32-S3, dual-core Xtensa LX7
+- Flash: 16 MB
+- PSRAM: 8 MB OPI
+- LCD: 2.8-inch IPS ILI9341V, native 240 x 320, SPI
+- Touch: FT6336G capacitive controller, I2C address 0x38
+- Audio: ES8311 codec / I2S path (not a GPIO buzzer)
+- Status LED: single WS2812-compatible RGB LED on GPIO42
+- microSD: SDIO interface
+
+## Display pin map
+
+| Signal | GPIO |
+|---|---:|
+| LCD CS | 10 |
+| LCD DC | 46 |
+| LCD SCLK | 12 |
+| LCD MOSI | 11 |
+| LCD MISO | 13 |
+| LCD backlight | 45 |
+| LCD reset | Shared with CHIP_PU |
+
+The panel is configured at its native portrait geometry (240 x 320). The application rotates it to landscape (320 x 240).
+
+## FT6336G touch pin map
+
+| Signal | GPIO |
+|---|---:|
+| I2C SDA | 16 |
+| I2C SCL | 15 |
+| Reset (active low) | 18 |
+| Interrupt (active low) | 17 |
+| I2C address | 0x38 |
+
+The FT6336G reports native portrait coordinates. touch.cpp maps these into the application's landscape coordinate space, then applies the persisted affine calibration. A new orientation identifier invalidates calibration saved for the former XPT2046-based board.
+
+## Other interfaces
+
+| Function | GPIO / interface |
 |---|---|
-| MCU | ESP32-WROOM-32, 2 × 240 MHz Xtensa LX6, 520 KB SRAM, **no PSRAM** |
-| Flash | 4 MB |
-| Display | 2.8" TFT, 240×320 (320×240 in landscape), 16-bit colour, SPI |
-| Display controller | ILI9341 (single micro-USB board) · ST7789 or ILI9341 (micro-USB + USB-C "CYD2USB") |
-| Touch | Resistive, XPT2046 controller |
-| Extras | RGB LED, LDR light sensor, speaker amplifier, micro SD slot, BOOT / RESET buttons |
-| Power | 5 V (micro-USB, USB-C or the P1 connector) |
+| WS2812 RGB LED | GPIO42 (addressable LED; driver not yet enabled) |
+| Battery measurement | GPIO9 ADC |
+| microSD | SDIO: CLK 38, CMD 40, D0 39, D1 41, D2 48, D3 47 |
+| Audio | ES8311 codec / I2S |
+| OBD-II Wi-Fi | Wi-Fi STA + TCP, adapter default port 35000 |
+| OBD-II Bluetooth | ESP32-S3 BLE GATT requires adapter service/characteristic profile; Bluetooth Classic SPP is not supported |
 
-## Pin map
-
-| Function | GPIO | Notes |
-|---|---|---|
-| LCD SCLK / MOSI / MISO | 14 / 13 / 12 | HSPI (SPI2), native IO_MUX pins → 40–80 MHz |
-| LCD CS / DC | 15 / 2 | RST is tied to EN (−1) |
-| LCD backlight | 21 | PWM (LEDC channel 0, 12 kHz) |
-| Touch CLK / MOSI / MISO / CS | 25 / 32 / 39 / 33 | **Software SPI** (see below) |
-| Touch IRQ | 36 | Input only; not used by the firmware (pressure measurement is sufficient) |
-| RGB LED (R / G / B) | 4 / 16 / 17 | Common anode: LOW = on (LEDC output is inverted) |
-| LDR (light sensor) | 34 | ADC1_CH6, input only, 0 dB attenuation |
-| Speaker amplifier input | 26 | "SPEAK" JST connector, LEDC tone generation |
-| SD card SCK / MISO / MOSI / CS | 18 / 19 / 23 / 5 | VSPI (SPI3) — reserved for data logging |
-| BOOT button | 0 | LOW = pressed |
-| CN1 connector | 22, 27 | 3.3 V, GND, IO22, IO27 → free (e.g. for a UART) |
-| P3 connector | 35, 22, 21 | IO35 is input only; IO21 is shared with the backlight! |
-| P1 (serial) | 1 / 3 | TX / RX (shared with the USB serial bridge) |
-
-All pins are defined in one place: [`CarCYD/src/config/board_config.h`](../CarCYD/src/config/board_config.h)
-
-### Why software SPI for the touch controller?
-The board has three SPI devices (display, touch, SD card) but the ESP32 only offers two usable SPI hosts. The
-display uses HSPI. The XPT2046 runs at ≤ 2.5 MHz, so driving it with software SPI costs nothing and **keeps
-VSPI free for the SD card**. (LovyanGFX's own CYD board definition uses the same approach.)
-
-## LEDC (PWM) channel plan
-
-With the ESP32 Arduino core 3.x, **channels with the same frequency and resolution share a hardware timer**.
-Speaker tones change the frequency, so sharing would make the backlight flicker. Therefore:
-
-| Channel | Pin | Frequency / resolution | Timer |
-|---|---|---|---|
-| 0 | 21 backlight | 12 kHz / 8 bit (above the audible range) | own |
-| 2 | 26 speaker | variable / 10 bit | own (unique configuration) |
-| 4, 5, 6 | 4, 16, 17 RGB LED | 5 kHz / 8 bit | shared (the frequency never changes) |
-
-## Board variants
-
-`board_config.h`:
-
-```cpp
-#define CYD_PANEL CYD_PANEL_ILI9341     // single micro-USB board
-#define CYD_PANEL CYD_PANEL_ILI9341_2   // micro-USB + USB-C "CYD2USB" (use with CYD_PANEL_INVERT 1)
-#define CYD_PANEL CYD_PANEL_ST7789      // 2-USB boards fitted with an ST7789 (use with CYD_PANEL_INVERT 0)
-#define CYD_PANEL_INVERT 1              // colours look like a photo negative
-#define CYD_LCD_SPI_HZ 55000000         // faster display (works on most boards)
-#define CYD_PANEL_ROTATION_OFFSET 4     // advanced: orientation / mirror override (normally not needed)
-```
-
-### Orientation and mirroring
-
-The picture orientation depends on two things: the **GS** bit (gate scan direction, register B6h) in the
-panel's init sequence and the **MADCTL** value from LovyanGFX's rotation table. The firmware selects the correct
-offsets for every variant:
-
-| Variant | B6h (GS) | Panel `offset_rotation` | Landscape MADCTL | Touch `offset_rotation` |
-|---|---|---|---|---|
-| `CYD_PANEL_ILI9341` | `08 C2 27` (GS=1) | 2 | MV · MY | 0 |
-| `CYD_PANEL_ILI9341_2` | `08 82 27` (GS=0) | **4** (mirrored) | MV | 6 |
-| `CYD_PANEL_ST7789` | — | 0 | MV · MX | 2 |
-
-The ILI9341 and ST7789 values match LovyanGFX's Sunton ESP32-2432S028 board definition. The ILI9341_2 init
-sequence clears the GS bit, which scans the long axis in the opposite direction; with the same MADCTL the
-picture would be **mirrored left to right**. Offset 4 compensates for it. The touch offset is derived from the
-panel offset, so touch input is unaffected (`src/hal/lcd.cpp`, verified at compile time with `static_assert`).
-
-When the panel type or orientation changes, the stored touch calibration is discarded and the calibration
-screen appears automatically at the next start.
-
-| Symptom | Fix |
-|---|---|
-| White or blank screen | Try the other `CYD_PANEL` variants |
-| Colours look negative | Toggle `CYD_PANEL_INVERT` |
-| Picture mirrored (text reads backwards) | Check `CYD_PANEL`; if it is still mirrored set `CYD_PANEL_ROTATION_OFFSET` to 4 or 6 |
-| Picture upside down | *Settings → Display → Rotate screen 180°* (no rebuild needed) |
-| Touches are off or mirrored | *Settings → System → Touch calibration*, or hold BOOT while powering up |
-| Noise / artefacts on screen | Lower `CYD_LCD_SPI_HZ` to 27 MHz |
-
-## Light sensor (LDR) tuning
-
-The LDR pulls the ADC input towards GND against a 1 MΩ pull-up: **bright light gives low readings, darkness
-gives high readings**. Auto-brightness maps the raw value on a logarithmic scale between two references:
-
-```cpp
-constexpr uint16_t kLightRawBright = 40;    // bright daylight
-constexpr uint16_t kLightRawDark   = 1500;  // dark cabin
-```
-
-Boards differ. *Settings → Display → Ambient light* shows `percent · raw value` live; read the values on your
-board by day and at night and update the two constants.
-
-## In-car installation
-
-- **Never connect the CYD directly to the 12 V system.** Use an automotive grade (load-dump protected)
-  12 V → 5 V converter that also tolerates the drop to 6–7 V while cranking.
-- The TN panel has narrow viewing angles; mount the screen facing the driver. For upside-down mounting use
-  *Settings → Display → Rotate screen 180°* (touch follows automatically).
-- Keep the display out of direct sunlight on the dashboard; the panel heats up quickly.
-- The RGB LED is on the back of the board and gives a background glow for the shift light and warnings. All
-  warnings are always shown on screen as well; the LED can be disabled in *Settings → Sound & light*.
-
-## ELM327 OBD-II adapter
-
-The CYD has no CAN / K-Line hardware; it reads the car through an ELM327 adapter plugged into the OBD-II
-port (*Settings → Connection*).
-
-| Adapter type | Works | Notes |
-|---|---|---|
-| Bluetooth Classic (e.g. "OBDII", "V-LINK", most v1.5 / v2.1 clones) | yes | Found automatically by name; PINs 1234, 0000, 6789, 1111 and Secure Simple Pairing |
-| Wi-Fi (e.g. "WiFi_OBDII", "V-LINK") | yes | Open network found automatically by name; TCP to the gateway address (usually 192.168.0.10), port 35000 |
-| Bluetooth LE only (iOS adapters such as OBDLink CX) | no | Not supported by this firmware |
-
-- Many adapters stay powered with the ignition off and drain the battery slowly; unplug them when the car is
-  parked for long periods.
-- With the ignition off the adapter connects (Bluetooth / Wi-Fi icon green) but the ECU does not answer
-  (car icon blinking); CarCYD retries every 4 s.
-- If the screen resets when Bluetooth or Wi-Fi starts, check *Settings → About → Last restart*: "Brownout"
-  means the supply sags when the radio switches on — use a short USB cable / a 5 V 2 A supply.
-- Only one radio is used at a time. Firmware size requires the **Huge APP (3MB No OTA)** partition scheme.
+The board does not provide the CYD XPT2046 resistive touch controller, LDR, three discrete RGB LED pins, or GPIO speaker amplifier input. Those legacy functions are disabled in this board configuration until their ES3C28P-specific drivers are implemented.

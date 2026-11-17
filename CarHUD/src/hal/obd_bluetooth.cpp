@@ -1,3 +1,37 @@
+#if defined(CONFIG_IDF_TARGET_ESP32S3)
+// ESP32-S3 does not implement Bluetooth Classic SPP. BLE GATT support needs
+// the target adapter's service and characteristic UUIDs before it can connect.
+#include "../core/log.h"
+#include "obd_adapter.h"
+#include "obd_internal.h"
+namespace hal::obd {
+namespace {
+class BleTransportPending final : public core::ObdTransport {
+ public:
+  core::AdapterTransport kind() const override { return core::AdapterTransport::Bluetooth; }
+  bool configured() const override { return false; }
+  void open() override {
+    state_ = State::Failed;
+    LOG_W("BLE", "BLE GATT profile has not been configured for this ELM327 adapter");
+  }
+  void close() override { state_ = State::Closed; }
+  State state() override { return state_; }
+  size_t read(uint8_t*, size_t) override { return 0; }
+  void write(const char*) override {}
+ private:
+  State state_ = State::Closed;
+};
+BleTransportPending g_transport;
+}
+core::ObdTransport& bluetooth() { return g_transport; }
+bool bluetooth_started() { return false; }
+bool start_bluetooth() { return false; }
+namespace detail {
+void bt_scan_start() { results_clear(); set_scanning(false); }
+void bt_power_down() { g_transport.close(); }
+}
+}
+#else
 /**
  * @file obd_bluetooth.cpp
  * ELM327 over Bluetooth Classic SPP (BluetoothSerial, master role).
@@ -35,7 +69,7 @@ namespace {
 using State = core::ObdTransport::State;
 using detail::Op;
 
-constexpr const char* kDeviceName = "CarCYD";
+constexpr const char* kDeviceName = "CarHUD";
 constexpr const char* kWorkerName = "obd_bt";
 constexpr int kScanMs = 10240;            // 8 inquiry units of 1.28 s
 constexpr uint8_t kMaxDevices = 16;
@@ -82,7 +116,7 @@ bool ensure_started() {
   // Newer adapters use Secure Simple Pairing: confirm, and answer a passkey with the current PIN.
   g_bt.onConfirmRequest([](uint32_t) { g_bt.confirmReply(true); });
   g_bt.onKeyRequest([]() { g_bt.respondPasskey(g_passkey.load()); });
-  // Master role; BLE memory is released (CarCYD only uses Classic).
+  // Master role; BLE memory is released (CarHUD only uses Classic).
   detail::set_step(detail::Step::BtStart);
   if (!g_bt.begin(kDeviceName, true, true)) {
     LOG_E("BT", "Bluetooth start failed");
@@ -347,3 +381,5 @@ void bt_power_down() {
 
 }  // namespace detail
 }  // namespace hal::obd
+
+#endif

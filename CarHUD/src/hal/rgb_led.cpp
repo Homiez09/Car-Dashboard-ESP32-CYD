@@ -24,6 +24,7 @@ void write_channel(uint8_t index, int pin, uint8_t value) {
 }
 
 void write(Color c, float gain) {
+  if (board::kLedRed < 0 || board::kLedGreen < 0 || board::kLedBlue < 0) return;
   const float k = gain * g_intensity / 100.0f;
   write_channel(0, board::kLedRed, static_cast<uint8_t>(c.r * k));
   write_channel(1, board::kLedGreen, static_cast<uint8_t>(c.g * k));
@@ -33,6 +34,7 @@ void write(Color c, float gain) {
 }  // namespace
 
 void init() {
+  if (board::kLedRed < 0 || board::kLedGreen < 0 || board::kLedBlue < 0) return;
   const int pins[] = {board::kLedRed, board::kLedGreen, board::kLedBlue};
   const uint8_t channels[] = {board::kLedcRed, board::kLedcGreen, board::kLedcBlue};
   for (uint8_t i = 0; i < 3; ++i) {

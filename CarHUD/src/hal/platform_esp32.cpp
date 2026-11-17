@@ -1,6 +1,6 @@
 /**
  * @file platform_esp32.cpp
- * Implementation of the platform port (core/platform.h) on the CYD.
+ * Implementation of the platform port (core/platform.h) on the LCDWiki ES3C28P.
  * restart() and factory_reset() live in app.cpp because they have to persist
  * application data first.
  */
@@ -49,7 +49,7 @@ void system_info(SystemInfo& out) {
   out.heap_min_free = ESP.getMinFreeHeap();
   out.heap_total = ESP.getHeapSize();
   out.sdk_version = ESP.getSdkVersion();
-  out.board_name = CYD_BOARD_NAME;
+  out.board_name = ES3C28P_BOARD_NAME;
   out.panel_name = hal::lcd_panel_name();
   out.reset_reason = reset_reason_text();
   out.radio_report = hal::obd::crash_report();

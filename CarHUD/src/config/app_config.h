@@ -5,7 +5,7 @@
 #pragma once
 
 // ---- Identity -----------------------------------------------------------------------
-#define APP_NAME "CarCYD"
+#define APP_NAME "CarHUD"
 #define APP_VERSION_MAJOR 1
 #define APP_VERSION_MINOR 1
 #define APP_VERSION_PATCH 0

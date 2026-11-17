@@ -25,6 +25,7 @@ uint16_t sample() {
 }  // namespace
 
 void init() {
+  if (board::kLightSensor < 0) { g_filtered = 0.0f; return; }
   pinMode(board::kLightSensor, INPUT);
   // 0 dB attenuation: the LDR divider only swings a few hundred millivolts.
   analogSetPinAttenuation(board::kLightSensor, ADC_0db);
@@ -32,6 +33,7 @@ void init() {
 }
 
 void update(uint32_t now_ms) {
+  if (board::kLightSensor < 0) return;
   if (g_last_ms != 0 && core::elapsed(now_ms, g_last_ms) < kSamplePeriodMs) return;
   const uint32_t dt = g_last_ms ? core::elapsed(now_ms, g_last_ms) : kSamplePeriodMs;
   g_last_ms = now_ms;
@@ -41,6 +43,7 @@ void update(uint32_t now_ms) {
 uint16_t raw() { return static_cast<uint16_t>(g_filtered < 0 ? 0 : g_filtered + 0.5f); }
 
 uint8_t level() {
+  if (board::kLightSensor < 0) return 100;
   // The LDR resistance is roughly logarithmic in lux: map on a log scale.
   const float lo = logf(static_cast<float>(board::kLightRawBright) + 1.0f);
   const float hi = logf(static_cast<float>(board::kLightRawDark) + 1.0f);
