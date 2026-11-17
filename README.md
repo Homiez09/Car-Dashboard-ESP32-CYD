@@ -2,11 +2,11 @@
 
 <div align="center">
 
-<img src="images/car-dashboard-esp32-cyd-banner.svg" alt="CarHUD: the ESP32-S3 ES3C28P LCDWiki ESP32-S3 ES3C28P running the car dashboard firmware, with the tachometer ring, speed, engine speed and gear of the gauge cluster moving as the car accelerates and brakes" width="100%">
+<img src="images/car-dashboard-esp32-cyd-banner.svg" alt="CarHUD dashboard running on the LCDWiki ESP32-S3 ES3C28P" width="100%">
 
 # CarHUD — ESP32-S3 Car Dashboard for LCDWiki ES3C28P
 
-**Turn a ~$15 ESP32-S3 ES3C28P "LCDWiki ESP32-S3 ES3C28P" into a digital gauge cluster and OBD-II diagnostic screen.**<br>
+**Turn the LCDWiki ESP32-S3 ES3C28P 2.8-inch display into a digital gauge cluster and OBD-II diagnostic screen.**<br>
 Open-source firmware built with LVGL 9 and the Arduino IDE: tachometer and speedometer, live engine data with charts, a fault code reader, a trip computer and driver alerts. It reads the car through a cheap ELM327 OBD-II adapter over Bluetooth or Wi-Fi.
 
 <p>
@@ -21,7 +21,7 @@ Open-source firmware built with LVGL 9 and the Arduino IDE: tachometer and speed
 <p>
   <a href="#-what-you-need"><img alt="ESP32" height="24" src="https://img.shields.io/badge/ESP32-E7352C?style=flat&logo=espressif&logoColor=white"></a>
   <a href="#-quick-start"><img alt="Arduino IDE" height="24" src="https://img.shields.io/badge/Arduino%20IDE-00979D?style=flat&logo=arduino&logoColor=white"></a>
-  <a href="#-what-you-need"><img alt="Board: ESP32-S3 ES3C28P LCDWiki ESP32-S3 ES3C28P" height="24" src="https://img.shields.io/badge/Cheap%20Yellow%20Display-ESP32--2432S028R-F0BE28?style=flat&labelColor=1f2328"></a>
+  <a href="#-what-you-need"><img alt="Board: LCDWiki ES3C28P" height="24" src="https://img.shields.io/badge/Board-ES3C28P-0891b2?style=flat&labelColor=1f2328"></a>
   <a href="#-architecture"><img alt="LVGL 9.6" height="24" src="https://img.shields.io/badge/LVGL-9.6-0891b2?style=flat&labelColor=1f2328"></a>
 </p>
 
@@ -33,13 +33,13 @@ Open-source firmware built with LVGL 9 and the Arduino IDE: tachometer and speed
 
 ## 📌 Overview
 
-**CarHUD** is an open-source **car dashboard firmware** for the **ESP32 LCDWiki ESP32-S3 ES3C28P** (CYD, **ESP32-S3 ES3C28P**, 2.8" 320×240 touchscreen). It is built with **LVGL 9** and the **Arduino IDE** and turns the board into a digital **gauge cluster** with a tachometer and speedometer, **live OBD-II data** from an **ELM327 adapter** (Bluetooth / Wi-Fi) with charts, a **DTC fault code reader** with one-tap clear, a **trip computer**, smart **driver alerts** and more than 25 settings.
+**CarHUD** is open-source car dashboard firmware for the **LCDWiki ESP32-S3 ES3C28P**, featuring a 2.8-inch 240×320 ILI9341V display and FT6336G capacitive touch.
 
 It was designed and engineered like a commercial automotive HMI: clean layered architecture, DMA display driver, persistent settings, touch calibration, auto-brightness, localization and a PC simulator.
 
 > [!NOTE]
 > This is a fork of [muki01/Car-Dashboard-ESP32-CYD](https://github.com/muki01/Car-Dashboard-ESP32-CYD) by
-> Muksin Muksin. It adds reading a real car through an **ELM327 OBD-II adapter** over Bluetooth Classic or Wi-Fi.
+> The original dashboard UI and architecture are derived from the upstream ESP32 dashboard project. CarHUD adapts the hardware layer for the LCDWiki ES3C28P.
 
 > **No car at hand?** The PC simulator renders every screen with a simulated car (cold start, gear shifts,
 > warnings, stored fault codes) — see [Develop the UI on your PC](#%EF%B8%8F-develop-the-ui-on-your-pc). The firmware itself always reads the car through an ELM327 adapter.
@@ -69,7 +69,7 @@ It was designed and engineered like a commercial automotive HMI: clean layered a
 | 🌍 **Localization** | English and Turkish UI with a custom font set (Barlow + Material Design Icons) |
 | 🧪 **Developer tooling** | PC simulator that renders every screen, font/icon generator, CI builds for all board variants |
 
-### Uses every part of the LCDWiki ESP32-S3 ES3C28P
+### ES3C28P hardware
 
 | CYD hardware | What CarHUD does with it |
 | :-- | :-- |
@@ -117,23 +117,21 @@ All 29 screens: [English](images/screenshots/en) · [Turkish UI](images/screensh
 
 | Part | Notes |
 | :-- | :-- |
-| **ESP32-S3 ES3C28P** "LCDWiki ESP32-S3 ES3C28P" | 1-USB (ILI9341) or 2-USB "CYD2USB" (ILI9341 / ILI9341V) version |
+| **LCDWiki ES3C28P** | ESP32-S3, 16 MB flash, 8 MB OPI PSRAM, ILI9341V display and FT6336G capacitive touch |
 | USB cable | Micro-USB or USB-C depending on the board |
-| Small 8 Ω speaker *(optional)* | JST 1.25 mm "SPEAK" connector for alert sounds |
+| Audio | ES8311 codec / I2S hardware; no direct GPIO speaker connection |
 | 12 V → 5 V automotive converter *(in the car)* | Load-dump protected; see the [hardware notes](docs/hardware.md#in-car-installation) |
-| ELM327 OBD-II adapter *(for real car data)* | Bluetooth Classic ("OBDII", "V-LINK", ...; PIN 1234 / 0000 / 6789 / 1111 tried automatically) or Wi-Fi ("WiFi_OBDII", open network) — BLE-only adapters are not supported |
+| ELM327 OBD-II adapter | Wi-Fi TCP (default port 35000); BLE support depends on the adapter's GATT profile and is not enabled in this initial hardware port |
 
 ## 🚀 Quick Start
 
 ### Flash a prebuilt firmware (no IDE needed)
 
-Every [release](https://github.com/Homiez09/Car-Dashboard-ESP32-CYD/releases/latest) ships ready-to-flash images:
+The manual GitHub Actions build produces a merged firmware image for ES3C28P:
 
 | Your board | Release file |
 | :-- | :-- |
-| one micro-USB port | `CarHUD-<version>-CYD-1USB-ILI9341.bin` |
-| micro-USB **and** USB-C | `CarHUD-<version>-CYD2USB-ILI9341.bin` |
-| 2-USB board with ILI9341V | `CarHUD-<version>-CYD2USB-ILI9341V.bin` |
+| ES3C28P | `CarHUD.ino.merged.bin` |
 
 1. Open the **[ESP web flasher](https://espressif.github.io/esptool-js/)** in Chrome or Edge, click *Connect* and choose the board's serial port (Windows may need the CH340 USB driver).
 2. Set the flash address to **`0x0`**, select the `.bin` file and click *Program*.
@@ -146,16 +144,13 @@ Command line alternative: `pip install esptool`, then `esptool --chip esp32 writ
 1. **Board package:** *Boards Manager* → install **esp32 by Espressif Systems** 3.x. If it is not listed, add `https://espressif.github.io/arduino-esp32/package_esp32_index.json` under *File → Preferences → Additional boards manager URLs*.
 2. **Libraries:** *Library Manager* → install **lvgl** (9.6 or newer) and **LovyanGFX** (1.2 or newer).
 3. **Open** `CarHUD/CarHUD.ino`. `lv_conf.h` ships inside the sketch folder and is found automatically — *no copying into the libraries folder, no editing of library files.*
-4. **Select your board variant** in [`CarHUD/src/config/board_config.h`](CarHUD/src/config/board_config.h):
+4. The repository is configured for ES3C28P; no CYD panel variant needs to be selected.
 
    | Your board | Setting |
    | :-- | :-- |
-   | one micro-USB port | `CYD_PANEL_ILI9341` and `CYD_PANEL_INVERT 0` |
-   | micro-USB **and** USB-C | `CYD_PANEL_ILI9341_2` and `CYD_PANEL_INVERT 1` *(repository default)* |
-   | 2-USB board with ILI9341V | `CYD_PANEL_ILI9341V` and `CYD_PANEL_INVERT 0` |
 
-5. **Tools menu:** Board *ESP32 Dev Module*, Partition Scheme **Huge APP (3MB No OTA/1MB SPIFFS)**, PSRAM *Disabled*.
-   The Bluetooth and Wi-Fi stacks do not fit the default 1.25 MB app partition ("Sketch too big").
+5. **Tools menu:** Select **ESP32S3 Dev Module**, 16 MB flash, OPI PSRAM and the `app3M_fat9M_16MB` partition scheme.
+   The build workflow uses ESP32 Arduino core 3.2.1.
 6. **Upload.** On the first start a short touch calibration runs (tap four targets). Done.
 
 ### arduino-cli
@@ -197,7 +192,7 @@ flowchart LR
     ALERTS --> UI
     ALERTS --> OUT[Speaker · RGB LED]
     UI --> LCD[ILI9341 / ILI9341V<br/>DMA via LovyanGFX]
-    TOUCH[XPT2046 touch] --> UI
+    TOUCH[FT6336G capacitive touch] --> UI
     SETTINGS[(NVS settings)] --- UI
 ```
 
@@ -250,7 +245,7 @@ See [tools/simulator](tools/simulator/README.md). Fonts and icons are regenerate
 
 - [x] Gauge cluster, live data, diagnostics, trip computer, alerts, settings
 - [x] Touch calibration, auto brightness, localization, PC simulator with a simulated car
-- [x] **Vehicle link:** ELM327 OBD-II adapter over Bluetooth Classic or Wi-Fi
+- [x] **Vehicle link:** ELM327 OBD-II adapter over Wi-Fi TCP
 - [ ] Freeze-frame data and readiness monitors
 - [ ] Data logging to the micro SD card (CSV)
 - [ ] OTA updates (needs a single-radio build: Bluetooth + Wi-Fi do not fit two OTA slots in 4 MB)
@@ -260,11 +255,11 @@ See [tools/simulator](tools/simulator/README.md). Fonts and icons are regenerate
 ## ❓ FAQ
 
 <details>
-<summary><b>Can the CYD read my car's OBD-II port directly?</b></summary>
+<summary><b>Can the ES3C28P read my car's OBD-II port directly?</b></summary>
 
 <br>
 
-Not by wire — the board has no CAN transceiver or K-Line interface. Plug a cheap **ELM327** adapter into the
+Not by wire — the board has no CAN transceiver or K-Line interface. Use an ELM327 adapter and connect over Wi-Fi (*Settings → Connection*). BLE GATT support will be enabled after the target adapter profile is confirmed.
 car's OBD-II port and CarHUD reads it wirelessly over **Bluetooth Classic** or **Wi-Fi** (*Settings →
 Connection*). All OBD-II protocols the adapter supports (CAN, KWP2000, ISO 9141, J1850) work; the protocol is
 detected automatically.
@@ -272,11 +267,11 @@ detected automatically.
 </details>
 
 <details>
-<summary><b>Which LCDWiki ESP32-S3 ES3C28P versions are supported?</b></summary>
+<summary><b>Which display and touch hardware does ES3C28P use?</b></summary>
 
 <br>
 
-The original ESP32-S3 ES3C28P (ILI9341, one micro-USB port) and the two-USB "CYD2USB" versions (ILI9341 with alternative init, or ILI9341V). Colour inversion, mirroring and touch orientation are handled per variant — see [docs/hardware.md](docs/hardware.md).
+The supported target is the LCDWiki ES3C28P with an ILI9341V 240×320 LCD and FT6336G capacitive touch. Pin assignments are documented in [docs/hardware.md](docs/hardware.md).
 
 </details>
 
@@ -285,7 +280,7 @@ The original ESP32-S3 ES3C28P (ILI9341, one micro-USB port) and the two-USB "CYD
 
 <br>
 
-LovyanGFX is configured entirely inside the project (no editing of `User_Setup.h` in the library folder), supports DMA, and drives the XPT2046 touch controller over software SPI so the SD card keeps its own bus.
+LovyanGFX drives the ILI9341V display over SPI with DMA. Touch input is read separately from the FT6336G capacitive controller over I2C.
 
 </details>
 
@@ -303,7 +298,7 @@ No. It lives in `CarHUD/lv_conf.h`. The ESP32 Arduino core puts the sketch folde
 
 <br>
 
-Select the matching `CYD_PANEL` / `CYD_PANEL_INVERT` in `board_config.h`. Upside down: *Settings → Display → Rotate screen 180°*. The full troubleshooting table is in [docs/hardware.md](docs/hardware.md#orientation-and-mirroring).
+The board configuration is fixed for ES3C28P. If the image is upside down, use *Settings → Display → Rotate screen 180°*; the FT6336G coordinates follow the display orientation.
 
 </details>
 
@@ -454,7 +449,7 @@ Copyright © 2026 Muksin Muksin.
 
 Created by [**Muki**](https://github.com/muki01) · If this project helped you, please give it a ⭐
 
-<sub>ESP32 car dashboard · LCDWiki ESP32-S3 ES3C28P · CYD · ESP32-S3 ES3C28P · LVGL 9 · OBD2 display · OBD-II gauge · digital gauge cluster · tachometer · speedometer · DTC reader · trip computer · Arduino IDE · LovyanGFX</sub>
+<sub>ESP32 car dashboard · LCDWiki ESP32-S3 ES3C28P · ES3C28P · LVGL 9 · OBD2 display · OBD-II gauge · digital gauge cluster · tachometer · speedometer · DTC reader · trip computer · Arduino IDE · LovyanGFX</sub>
 
 **[⬆ Back to top](#readme-top)**
 
