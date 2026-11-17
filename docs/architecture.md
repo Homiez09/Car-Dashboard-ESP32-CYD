@@ -4,7 +4,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ CarCYD.ino  →  app::setup() / app::loop()                        │
+│ CarHUD.ino  →  app::setup() / app::loop()                        │
 ├─────────────────────────────────────────────────────────────────┤
 │ app/        Composition root: creates the drivers, data source   │
 │             and storage and wires them to core and ui            │

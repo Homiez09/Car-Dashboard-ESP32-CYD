@@ -1,6 +1,6 @@
 /**
  * @file touch.h
- * LVGL pointer input for the XPT2046 resistive touch panel, with a per-unit
+ * LVGL pointer input for the FT6336G capacitive touch panel, with a per-unit
  * affine correction (user calibration) and press debouncing.
  */
 #pragma once
