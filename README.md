@@ -7,7 +7,7 @@
 # CarHUD — ESP32-S3 Car Dashboard for LCDWiki ES3C28P
 
 **Turn the LCDWiki ESP32-S3 ES3C28P 2.8-inch display into a digital gauge cluster and OBD-II diagnostic screen.**<br>
-Open-source firmware built with LVGL 9 and the Arduino IDE: tachometer and speedometer, live engine data with charts, a fault code reader, a trip computer and driver alerts. It reads the car through a cheap ELM327 OBD-II adapter over Bluetooth or Wi-Fi.
+Open-source firmware built with LVGL 9 and the Arduino IDE. ELM327 data currently uses Wi-Fi TCP; BLE GATT support is pending adapter-profile confirmation.
 
 <p>
   <a href="https://github.com/Homiez09/Car-Dashboard-ESP32-CYD/stargazers"><img alt="GitHub stars" height="28" src="https://img.shields.io/github/stars/Homiez09/Car-Dashboard-ESP32-CYD?style=flat&logo=github&logoColor=white&label=Stars&labelColor=1f2328&color=0891b2"></a>
@@ -35,7 +35,7 @@ Open-source firmware built with LVGL 9 and the Arduino IDE: tachometer and speed
 
 **CarHUD** is open-source car dashboard firmware for the **LCDWiki ESP32-S3 ES3C28P**, featuring a 2.8-inch 240×320 ILI9341V display and FT6336G capacitive touch.
 
-It was designed and engineered like a commercial automotive HMI: clean layered architecture, DMA display driver, persistent settings, touch calibration, auto-brightness, localization and a PC simulator.
+It uses a layered architecture, DMA display driver, persistent settings, touch calibration, display brightness controls, localization and a PC simulator.
 
 > [!NOTE]
 > This is a fork of [muki01/Car-Dashboard-ESP32-CYD](https://github.com/muki01/Car-Dashboard-ESP32-CYD) by
@@ -61,24 +61,24 @@ It was designed and engineered like a commercial automotive HMI: clean layered a
 | 🏎️ **Gauge cluster** | 270° tachometer ring with red zone, digital speed, gear indicator, flashing **shift light**, start-up needle sweep |
 | 📊 **Two dashboard views** | Cluster with four corner values, or six mini gauges — swipe to switch, **long-press to customize** any value |
 | 📈 **Live data** | 18 engine signals with severity colors; tap for a real-time **chart with min / avg / max** |
-| 🔌 **ELM327 OBD-II adapter** | Real car data over **Bluetooth** or **Wi-Fi**: scan and pick the adapter in the settings, automatic protocol detection, live PIDs, battery voltage; status bar icons for the adapter and vehicle link |
+| 🔌 **ELM327 OBD-II adapter** | Wi-Fi TCP connection, automatic protocol detection, live PIDs, battery voltage and ECU link status; BLE GATT is pending adapter-profile confirmation |
 | 🔧 **OBD-II diagnostics** | Check-engine (MIL) status, **read & clear DTCs**, stored / pending / permanent codes, descriptions for 92 common codes, severity and advice |
 | 🚨 **Driver alerts** | Coolant, oil, battery low/high, fuel, speed limit, check engine, link lost — debounced, with hysteresis, on-screen banner, sound and LED |
 | 🧭 **Trip computer** | Distance, drive time, average / max speed, fuel used, average consumption and a **0-100 km/h (0-60 mph) timer** |
-| ⚙️ **25+ settings** | Auto brightness, day/night levels, 180° rotation, 5 accent colors, units (km/h·mph, °C·°F, kPa·bar·psi), gauge range, warning thresholds, sounds |
+| ⚙️ **25+ settings** | Display brightness, 180° rotation, 5 accent colors, units, gauge range, warning thresholds and sounds |
 | 🌍 **Localization** | English and Turkish UI with a custom font set (Barlow + Material Design Icons) |
-| 🧪 **Developer tooling** | PC simulator that renders every screen, font/icon generator, CI builds for all board variants |
+| 🧪 **Developer tooling** | PC simulator, font/icon generator and manual ES3C28P firmware build |
 
 ### ES3C28P hardware
 
-| CYD hardware | What CarHUD does with it |
+| ES3C28P hardware | CarHUD configuration |
 | :-- | :-- |
-| ILI9341 / ILI9341V 2.8" TFT | LVGL 9 with two DMA buffers and zero-copy `RGB565_SWAPPED` transfers |
-| FT6336G capacitive touch | Software SPI (keeps VSPI free for the SD card), debouncing, 3+1-point calibration |
+| ILI9341V 2.8-inch TFT | LVGL 9 with DMA buffers over SPI2 |
+| FT6336G capacitive touch | I2C input, debouncing and touch calibration |
 | Backlight PWM | Perceptual brightness curve with smooth fades |
-| LDR light sensor | Automatic day / night brightness |
-| Speaker output | Touch clicks, confirmation tones, warning and critical alarm melodies |
-| RGB LED | Shift light, warning status, "waiting for vehicle" indicator |
+| Ambient light sensor | Not fitted; ambient-light input is disabled |
+| Audio | ES8311 codec / I2S hardware; legacy GPIO buzzer is disabled |
+| Status LED | Single WS2812-compatible LED; addressable driver is not enabled yet |
 | BOOT button | Acknowledge alerts, next page, back to dashboard, calibration at power-up |
 | NVS flash | Settings, calibration and trip data — versioned and CRC protected |
 
@@ -117,7 +117,7 @@ All 29 screens: [English](images/screenshots/en) · [Turkish UI](images/screensh
 
 | Part | Notes |
 | :-- | :-- |
-| **LCDWiki ES3C28P** | ESP32-S3, 16 MB flash, 8 MB OPI PSRAM, ILI9341V display and FT6336G capacitive touch |
+| **LCDWiki ES3C28P** | ESP32-S3, 16 MB flash, 8 MB OPI PSRAM, ILI9341V and FT6336G |
 | USB cable | Micro-USB or USB-C depending on the board |
 | Audio | ES8311 codec / I2S hardware; no direct GPIO speaker connection |
 | 12 V → 5 V automotive converter *(in the car)* | Load-dump protected; see the [hardware notes](docs/hardware.md#in-car-installation) |
@@ -137,7 +137,7 @@ The manual GitHub Actions build produces a merged firmware image for ES3C28P:
 2. Set the flash address to **`0x0`**, select the `.bin` file and click *Program*.
 3. Press the board's reset button — the touch calibration starts.
 
-Command line alternative: `pip install esptool`, then `esptool --chip esp32 write-flash 0x0 <file>.bin`. The image contains bootloader, partition table and application, so flashing it also resets stored settings.
+Command line alternative: use `esptool --chip esp32s3 write-flash 0x0 <file>.bin`. The image contains bootloader, partition table and application.
 
 ### Arduino IDE
 
@@ -158,11 +158,11 @@ Command line alternative: `pip install esptool`, then `esptool --chip esp32 writ
 ```bash
 arduino-cli core install esp32:esp32 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
 arduino-cli lib install "lvgl@9.6.0" "LovyanGFX"
-arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=huge_app CarHUD
-arduino-cli upload  --fqbn esp32:esp32:esp32:PartitionScheme=huge_app -p COM5 CarHUD   # your serial port
+arduino-cli compile --fqbn "esp32:esp32:esp32s3:FlashSize=16M,PSRAM=opi,PartitionScheme=app3M_fat9M_16MB" --warnings all --output-dir build CarHUD
+arduino-cli upload --fqbn "esp32:esp32:esp32s3:FlashSize=16M,PSRAM=opi,PartitionScheme=app3M_fat9M_16MB" -p COM5 CarHUD
 ```
 
-The firmware uses about **2.1 MB flash** (Bluetooth + Wi-Fi stacks) and **69 KB static RAM** and builds with zero warnings.
+The firmware image is built for the ES3C28P's 16 MB flash and 8 MB OPI PSRAM.
 
 ## 🎮 Using It
 
@@ -171,7 +171,7 @@ The firmware uses about **2.1 MB flash** (Bluetooth + Wi-Fi stacks) and **69 KB 
 - **Alerts:** tap the banner to acknowledge. Critical alerts repeat their sound until acknowledged.
 - **BOOT button:** short press = acknowledge alert / next page · long press = back to the dashboard ·
   hold during power-up = touch calibration.
-- **Real car:** plug the ELM327 adapter in, switch the ignition on, then *Settings → Connection* → choose
+- **Real car:** connect an ELM327 Wi-Fi adapter in *Settings → Connection*. BLE GATT is not enabled until its adapter profile is confirmed.
   **Bluetooth** or **Wi-Fi**. The adapter is found automatically (any vendor whose name looks like an OBD
   adapter) and remembered; if yours has an unusual name, tap *OBD adapter* and pick it from the scan list.
   Status bar: the Bluetooth / Wi-Fi icon is the adapter link, the car icon the link to the engine ECU —
@@ -183,7 +183,7 @@ The firmware uses about **2.1 MB flash** (Bluetooth + Wi-Fi stacks) and **69 KB 
 flowchart LR
     subgraph Vehicle data
         SIM[Simulated car<br/><i>PC simulator</i>] -.-> LINK{{DataLink}}
-        ELM[ELM327 link<br/>Bluetooth · Wi-Fi] --> LINK
+        ELM[ELM327 link<br/>Wi-Fi TCP · BLE (planned)] --> LINK
     end
     LINK --> STATE[(Vehicle state)]
     STATE --> ALERTS[Alert manager]
@@ -244,7 +244,7 @@ See [tools/simulator](tools/simulator/README.md). Fonts and icons are regenerate
 ## 🚧 Roadmap
 
 - [x] Gauge cluster, live data, diagnostics, trip computer, alerts, settings
-- [x] Touch calibration, auto brightness, localization, PC simulator with a simulated car
+- [x] Touch calibration, display brightness, localization, PC simulator with a simulated car
 - [x] **Vehicle link:** ELM327 OBD-II adapter over Wi-Fi TCP
 - [ ] Freeze-frame data and readiness monitors
 - [ ] Data logging to the micro SD card (CSV)
@@ -255,14 +255,12 @@ See [tools/simulator](tools/simulator/README.md). Fonts and icons are regenerate
 ## ❓ FAQ
 
 <details>
+<details>
 <summary><b>Can the ES3C28P read my car's OBD-II port directly?</b></summary>
 
 <br>
 
-Not by wire — the board has no CAN transceiver or K-Line interface. Use an ELM327 adapter and connect over Wi-Fi (*Settings → Connection*). BLE GATT support will be enabled after the target adapter profile is confirmed.
-car's OBD-II port and CarHUD reads it wirelessly over **Bluetooth Classic** or **Wi-Fi** (*Settings →
-Connection*). All OBD-II protocols the adapter supports (CAN, KWP2000, ISO 9141, J1850) work; the protocol is
-detected automatically.
+Not by wire — the board has no CAN transceiver or K-Line interface. Connect an ELM327 adapter over Wi-Fi from *Settings → Connection*. BLE GATT support is pending confirmation of the adapter's service and characteristic profile.
 
 </details>
 

@@ -10,7 +10,7 @@ CarHUD is Arduino/C++17 firmware for the LCDWiki ESP32-S3 ES3C28P (ILI9341V 240�
 
 ```bash
 # Firmware build for LCDWiki ESP32-S3 ES3C28P.
-# PartitionScheme=huge_app is required: BT + Wi-Fi stacks make the image ~2.1 MB ("Sketch too big" otherwise).
+# Use the ES3C28P 16 MB flash / OPI PSRAM profile and the app3M_fat9M_16MB partition scheme.
 FQBN="esp32:esp32:esp32s3:FlashSize=16M,PSRAM=opi,PartitionScheme=app3M_fat9M_16MB"
 arduino-cli compile --fqbn $FQBN --warnings all CarHUD
 arduino-cli compile --fqbn $FQBN --warnings all \
@@ -18,7 +18,7 @@ arduino-cli compile --fqbn $FQBN --warnings all \
 arduino-cli upload --fqbn $FQBN -p <port> CarHUD
 
 # Flashable images go to ./build (the user flashes from there, not from the arduino-cli cache).
-# The merged image (bootloader + partitions + app, flash at 0x0) is renamed per panel variant:
+# The merged image (bootloader + partitions + app) is ready to flash at 0x0:
 arduino-cli compile --fqbn $FQBN --warnings all --output-dir build CarHUD
 cp build/CarHUD.ino.merged.bin firmware-output/CarHUD.ino.merged.bin
 rm -f build/CarHUD.ino.elf build/CarHUD.ino.map
@@ -44,7 +44,7 @@ Layers under `CarHUD/src/` (see `docs/architecture.md` for the full picture):
 - `core/` — platform-independent logic: `VehicleState`, signal metadata/limits, `AlertManager`, `TripComputer`, DTC database, settings, units, i18n, persistence format. **Must not include `Arduino.h`, LVGL, or hardware headers.** Hardware expectations are declared in `core/platform.h`.
 - `ui/` — LVGL pages (`ui/pages/`, derived from `ui::Page`), reusable components (`ui/components/`), `theme.h` design tokens, generated fonts. Reaches hardware **only** via `core/platform.h` — that is what lets the same UI code compile in the simulator (`tools/simulator/sim_platform.cpp` is the PC implementation of `platform.h`; `hal/platform_esp32.cpp` is the device one).
 - `hal/` — drivers only (LovyanGFX ILI9341V display + FT6336G touch on I2C, backlight PWM, BOOT button, NVS, OBD adapter radios). No business rules.
-- `app/` — composition root and cooperative main loop; nothing depends on it. `select_data_source()` in `app.cpp` picks `Elm327Link` with the Bluetooth / Wi-Fi transport (or `NullLink` when the radio is paused after 3 failed boots in a row), and powers the unused radio down. Bluetooth is started in `setup()` between the display buffers and the UI (memory); switching to it at runtime restarts the device. With a radio running, `ui::set_keep_pages(false)` keeps only the visible page in memory.
+- `app/` — composition root and cooperative main loop; nothing depends on it. `select_data_source()` in `app.cpp` picks `Elm327Link` with the Bluetooth / Wi-Fi transport (or `NullLink` when the radio is paused after 3 failed boots in a row), and powers the unused radio down. The BLE transport is a placeholder until the ELM327 adapter GATT profile is confirmed; Wi-Fi TCP is the active radio transport. With a radio running, `ui::set_keep_pages(false)` keeps only the visible page in memory.
 - `config/` — `board_config.h` (ES3C28P GPIO and peripheral map), `app_config.h` (version, timing tunables).
 
 Key cross-cutting behaviour:
